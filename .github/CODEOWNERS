@@ -1,0 +1,27 @@
+# CODEOWNERS — Plataforma Cooperativa
+#
+# Dev A (principal): dueño de toda la lógica financiera y la infraestructura.
+# Dev B: dueño exclusivo del bot.
+#
+# Cualquier PR que toque archivos de Dev A requiere su revisión y aprobación.
+# Formato: <patrón>   <@usuario-github>
+#
+# IMPORTANTE: reemplaza @dev-a-github y @dev-b-github con los handles reales
+# antes de activar la branch protection rule en GitHub.
+
+# --- Regla de fallback: Dev A revisa todo por defecto ---
+*                           @dev-a-github
+
+# --- Paquetes de Dev A (lógica financiera, datos, infraestructura) ---
+/packages/core/             @dev-a-github
+/packages/contracts/        @dev-a-github
+/packages/api/              @dev-a-github
+/packages/desktop/          @dev-a-github
+
+# --- Documentación: Dev A revisa todo ---
+/docs/                      @dev-a-github
+/.github/                   @dev-a-github
+/pyproject.toml             @dev-a-github
+
+# --- Bot: Dev B es dueño, Dev A puede revisar pero no bloquea ---
+/packages/bot/              @dev-b-github
