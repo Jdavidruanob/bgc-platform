@@ -1,27 +1,23 @@
 # CODEOWNERS — Plataforma Cooperativa
 #
-# Dev A (principal): dueño de toda la lógica financiera y la infraestructura.
-# Dev B: dueño exclusivo del bot.
+# Jdavidruanob (principal): dueño de toda la lógica financiera y la infraestructura.
+# firerob: dueño exclusivo del bot.
 #
-# Cualquier PR que toque archivos de Dev A requiere su revisión y aprobación.
-# Formato: <patrón>   <@usuario-github>
-#
-# IMPORTANTE: reemplaza @dev-a-github y @dev-b-github con los handles reales
-# antes de activar la branch protection rule en GitHub.
+# Cualquier PR que toque paquetes de Jdavidruanob requiere su revisión y aprobación.
 
-# --- Regla de fallback: Dev A revisa todo por defecto ---
-*                           @dev-a-github
+# --- Regla de fallback: Jdavidruanob revisa todo por defecto ---
+*                           @Jdavidruanob
 
-# --- Paquetes de Dev A (lógica financiera, datos, infraestructura) ---
-/packages/core/             @dev-a-github
-/packages/contracts/        @dev-a-github
-/packages/api/              @dev-a-github
-/packages/desktop/          @dev-a-github
+# --- Paquetes de Jdavidruanob (lógica financiera, datos, infraestructura) ---
+/packages/core/             @Jdavidruanob
+/packages/contracts/        @Jdavidruanob
+/packages/api/              @Jdavidruanob
+/packages/desktop/          @Jdavidruanob
 
-# --- Documentación: Dev A revisa todo ---
-/docs/                      @dev-a-github
-/.github/                   @dev-a-github
-/pyproject.toml             @dev-a-github
+# --- Documentación: Jdavidruanob revisa todo ---
+/docs/                      @Jdavidruanob
+/.github/                   @Jdavidruanob
+/pyproject.toml             @Jdavidruanob
 
-# --- Bot: Dev B es dueño, Dev A puede revisar pero no bloquea ---
-/packages/bot/              @dev-b-github
+# --- Bot: firerob es dueño, Jdavidruanob puede revisar pero no bloquea ---
+/packages/bot/              @firerob
