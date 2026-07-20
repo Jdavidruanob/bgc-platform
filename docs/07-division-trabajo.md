@@ -30,13 +30,15 @@ Dev B trabaja **exclusivamente** sobre `packages/bot/` y contra el mock server d
 | B-06 | Implementar la resolución de entidades (llamada a `GET /socios?q=`, lógica de desambiguación, preguntas al operador) | 1 día |
 | B-07 | Implementar la máquina de estados del diálogo (estados: esperando_mensaje → procesando → esperando_confirmación → ejecutando → respondiendo; manejo de timeout y cancelación) | 2 días |
 | B-08 | Implementar la construcción del resumen de confirmación (texto legible con nombres, montos formateados, saldos) | 0.5 día |
-| B-09 | Implementar el generador de PDF del comprobante (reportlab, usando los datos del response de la API) | 1 día |
-| B-10 | Implementar el manejo de errores de la API (mostrar `mensaje` del error al operador, manejar 401/404/422/500 con mensajes distintos) | 0.5 día |
-| B-11 | Tests unitarios: resolución de entidades, máquina de estados, construcción del resumen, generación de PDF | 1.5 días |
-| B-12 | Test de integración end-to-end contra el mock server: flujo completo de aporte, retiro, pago, combinado | 1 día |
-| B-13 | Implementar las consultas (saldo, cuotas, caja) | 0.5 día |
-| B-14 | Configurar el despliegue en Fly.io / Railway (Dockerfile, variables de entorno, webhook de Telegram) | 1 día |
-| **Total** | | **~13 días** |
+| B-09 | Implementar el generador de PDF del comprobante (reportlab, usando los datos del response de la API) — aplica tanto para recibos como para tablas de liquidación | 1.5 días |
+| B-10 | Implementar las tres implementaciones de `Notificador`: `CloudApiNotificador` (WhatsApp Cloud API), `WaMeLinkNotificador` (fallback wa.me), `MockNotificador` (tests) | 2 días |
+| B-11 | Implementar el procesador de la cola de notificaciones: leer `GET /notificaciones/pendientes`, enviar via `Notificador`, actualizar estado via `PATCH /notificaciones/{id}` | 1 día |
+| B-12 | Implementar el manejo de errores de la API (mostrar `mensaje` del error al operador en Telegram, manejar 401/404/422/500) | 0.5 día |
+| B-13 | Tests unitarios: resolución de entidades, máquina de estados, resumen de confirmación, PDF, Notificador (con MockNotificador) | 1.5 días |
+| B-14 | Test de integración end-to-end contra el mock server: flujo completo de aporte, retiro, pago, crédito nuevo | 1 día |
+| B-15 | Implementar las consultas (socio, cuotas, caja) | 0.5 día |
+| B-16 | Configurar el despliegue en Fly.io / Railway (Dockerfile, variables de entorno, webhook de Telegram) | 1 día |
+| **Total** | | **~15 días** |
 
 ---
 
