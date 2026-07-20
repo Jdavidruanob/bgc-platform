@@ -126,7 +126,7 @@ Crea `packages/bot/.env` (nunca hagas commit de este archivo):
 ```bash
 # API
 COOP_API_BASE_URL=http://localhost:8001   # mock server local
-COOP_API_TOKEN=dev-secret                 # token de prueba del mock
+COOP_API_TOKEN=mock-secret                # token del mock (default)
 
 # Telegram
 TELEGRAM_BOT_TOKEN=<tu-token-de-@BotFather>
@@ -145,17 +145,21 @@ Para obtener `TELEGRAM_OPERADOR_CHAT_ID`: inicia una conversación con tu bot y 
 
 ## Socios ficticios del mock server
 
-Para tus pruebas, el mock server tiene estos socios:
+Para tus pruebas, el mock server tiene estos socios (definidos en `packages/contracts/src/coop_contracts/mock_data.py`):
 
-| ID | Nombre | Saldo | Créditos activos |
-|----|--------|-------|-----------------|
-| 1 | Pedro Antonio Gómez Ruiz | 320.000 | 1 (letra 101) |
-| 2 | María Elena López | 150.000 | 0 |
-| 3 | Carlos Hernández Morales | 500.000 | 2 (letras 102, 103) |
-| 4 | Rosa Inés Vargas | 80.000 | 0 |
-| 5 | Alberto Suárez | 1.200.000 | 1 (letra 104) |
+| ID | Nombre | Saldo | Créditos activos | WhatsApp |
+|----|--------|-------|-----------------|----------|
+| 1 | Pedro Antonio Gómez Ruiz | $320.000 | 1 (letra 450) | +573001234567 |
+| 2 | Pedro Luis Gómez Castro | $150.000 | 0 | +573009876543 |
+| 3 | María López Herrera | $250.000 | 0 | +573112223344 |
+| 4 | Carmenza Suárez Peña | $180.000 | 0 | +573124445566 |
+| 5 | Hernando Ruiz Vargas | $500.000 | 1 (letra 451) | +573201112233 |
 
-Saldo de caja del mock: **$12.450.000**
+> **Nota:** Los socios 1 y 2 son homónimos ("Pedro Gómez"). Cualquier búsqueda de "pedro" retorna ambos, lo que te permite probar el flujo de desambiguación (R-02 / R-05).
+
+Saldo de caja del mock: **$5.830.000**
+
+Token para el mock: `mock-secret` (valor por defecto; configurable con `API_SECRET_TOKEN`).
 
 ---
 
@@ -194,18 +198,33 @@ uv run pytest packages/bot/tests/test_flujo_completo.py -v
 Importa así desde tu código:
 
 ```python
+# Intenciones que el LLM produce (NLU → bot)
 from coop_contracts.intenciones import (
     IntRegAporte, IntRegRetiro, IntRegPago, IntRegCombinado,
-    IntConsultarSaldo, IntConsultarCuotas, IntConsultarCaja,
+    IntCrearCredito,
+    IntConsultarSocio, IntConsultarCuotas, IntConsultarCaja,
     IntDesconocida, IntIncompleta, IntAmbigua,
-    Intencion,
+    Intencion,  # Union de todas las anteriores
 )
+
+# Schemas de request (lo que el bot envía a la API)
 from coop_contracts.respuestas import (
-    RespAporte, RespRetiro, RespPago, RespCombinado,
-    RespSocio, RespCuotas, RespCaja,
-    ErrorResponse,
+    AportesRequest, RetirosRequest, PagosRequest, CombinadosRequest,
 )
+
+# Schemas de response (lo que la API devuelve al bot)
+from coop_contracts.respuestas import (
+    AportesResponse, RetiroResponse, PagosResponse, CombinadoResponse,
+    SociosSearchResponse, SocioDetalle,
+    CreditosResponse, CuotasPendientesResponse,
+    CajaEstado, ErrorResponse,
+)
+
+# Interfaz de notificaciones (para implementar tus Notificadores)
+from coop_contracts.notificador import Notificador, MockNotificador, ResultadoEnvio
 ```
+
+Ver todos los tipos disponibles en `packages/contracts/src/coop_contracts/__init__.py`.
 
 ---
 
