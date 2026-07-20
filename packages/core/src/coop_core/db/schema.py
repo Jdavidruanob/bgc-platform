@@ -90,14 +90,22 @@ CREATE TABLE IF NOT EXISTS config (
 CREATE TABLE IF NOT EXISTS notificaciones_whatsapp (
     id INTEGER PRIMARY KEY,
     socio_id INTEGER NOT NULL,
-    plantilla TEXT NOT NULL,
-    parametros TEXT NOT NULL,
-    adjunto_path TEXT,
+    numero_e164 TEXT NOT NULL,
+    texto TEXT NOT NULL,
     estado TEXT NOT NULL DEFAULT 'pendiente',
     intentos INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ultimo_intento_at TIMESTAMP,
+    error TEXT,
     FOREIGN KEY (socio_id) REFERENCES socios(id)
+);
+
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+    key TEXT PRIMARY KEY,
+    endpoint TEXT NOT NULL,
+    payload_hash TEXT NOT NULL,
+    response_json TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS audit_log (

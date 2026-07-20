@@ -9,6 +9,7 @@ dependencies = [
     "fastapi>=0.111",
     "uvicorn[standard]>=0.29",
     "psycopg[binary]>=3.1",
+    "rapidfuzz>=3.9",
 ]
 
 [tool.uv.sources]
@@ -19,9 +20,12 @@ coop-contracts = { workspace = true }
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/coop_api"]
-
-[tool.uv.sources]
-coop-core = { workspace = true }
-coop-contracts = { workspace = true }

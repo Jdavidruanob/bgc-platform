@@ -6,9 +6,9 @@ requires-python = ">=3.12"
 dependencies = [
     "coop-contracts",
     "httpx>=0.27",
-    "openai>=1.30",           # cliente para Whisper
+    "openai>=1.30",
     "python-telegram-bot>=21",
-    "reportlab>=4.2",         # generación de PDF
+    "reportlab>=4.2",
 ]
 
 [tool.uv.sources]
@@ -20,6 +20,3 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/coop_bot"]
-
-[tool.uv.sources]
-coop-contracts = { workspace = true }
