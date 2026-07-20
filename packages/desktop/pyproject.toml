@@ -19,3 +19,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/coop_desktop"]
+
+[tool.uv.sources]
+coop-core = { workspace = true }
