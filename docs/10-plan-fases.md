@@ -8,10 +8,10 @@
 ## Visión general
 
 ```
-Fase 0: Inventario ✅ (completado)
-Fase 1: coop-core extraído, limpio y testeado (SQLite)
-Fase 2: coop-contracts + mock server publicados → Dev B arranca
-Fase 3: coop-api funcional en staging (con Postgres de staging)
+Fase 0: Inventario ✅ (completado 2026-07-18)
+Fase 1: coop-core extraído, limpio y testeado ✅ (completado 2026-07-20, PR #2)
+Fase 2: coop-contracts + mock server publicados ✅ (completado 2026-07-20, PR #3)
+Fase 3: coop-api v0 implementada ✅ (completado 2026-07-20, PR #4 — pendiente merge y deploy)
 Fase 4: Migración a Postgres ← PUNTO DE NO RETORNO
 Fase 5: Bot completo integrado + deploy a producción
 Fase 6: Escritorio conectado a Postgres en producción
@@ -21,12 +21,16 @@ Fase 6: Escritorio conectado a Postgres en producción
 
 ## Fase 0 — Inventario ✅
 
-**Estado:** Completado (2026-07-18)  
+**Estado:** Completado (2026-07-18)
 **Entregable:** `docs/00-inventario-actual.md`
 
 ---
 
-## Fase 1 — Extracción de `coop-core`
+## Fase 1 — Extracción de `coop-core` ✅
+
+**Estado:** Completado (2026-07-20) — PR #2 mergeado.
+
+**Resultado:** 75 tests, 96% cobertura. Servicios y repositorios libres de Qt, compatibles con psycopg3.
 
 **Objetivo:** `packages/core/` contiene los servicios y repositorios extraídos de `BGC-software/`, libres de Qt, testeables sin sistema de archivos.
 
@@ -55,7 +59,11 @@ uv run python -c "from coop_core.services.aporte_service import AporteService; p
 
 ---
 
-## Fase 2 — `coop-contracts` + mock server
+## Fase 2 — `coop-contracts` + mock server ✅
+
+**Estado:** Completado (2026-07-20) — PR #3 mergeado. **Dev B puede arrancar.**
+
+**Resultado:** 45 tests, 97% cobertura. Mock server en puerto 8001, 5 socios ficticios con par de homónimos.
 
 **Objetivo:** Dev B tiene todo lo que necesita para arrancar sin esperar a la API real.
 
@@ -85,7 +93,17 @@ curl -X POST http://localhost:8001/operaciones/aportes \
 
 ---
 
-## Fase 3 — `coop-api` en staging
+## Fase 3 — `coop-api` en staging ⏳
+
+**Estado:** Código completo (2026-07-20) — PR #4 en revisión. Falta: merge + deploy a Fly.io/Railway con Postgres de staging.
+
+**Resultado del código:** 25 tests, 93% cobertura. Todos los endpoints de `docs/05` implementados.
+
+**Pendiente para cerrar la fase:**
+1. Mergear PR #4
+2. Crear instancia Postgres en Neon/Fly/Railway con las credenciales de staging
+3. Desplegar la API en Fly.io o Railway
+4. Correr `curl https://coop-api-staging.fly.dev/health` → `{"status": "ok"}`
 
 **Objetivo:** La API real funciona en un entorno de staging con Postgres de staging (no datos reales).
 

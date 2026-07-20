@@ -140,6 +140,7 @@ def execute_pago_op(
         dict_recibo["nro_cuotas_pagadas_start"] = items[0]["nro"]
         dict_recibo["nro_cuotas_pagadas_end"] = items[-1]["nro"]
         for it in items:
+            dict_recibo.setdefault("cuotas_pagadas", []).append(it["nro"])
             cursor.execute(
                 """
                 INSERT INTO detalle_recibo
@@ -171,6 +172,7 @@ def execute_pago_op(
         capital_puro: int = op["capital_puro"]
         for v in vencidas:
             nro = int(v["data"]["nro_cuota"])
+            dict_recibo.setdefault("cuotas_pagadas", []).append(nro)
             cursor.execute(
                 """
                 INSERT INTO detalle_recibo
