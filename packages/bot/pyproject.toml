@@ -11,6 +11,9 @@ dependencies = [
     "reportlab>=4.2",         # generación de PDF
 ]
 
+[tool.uv.sources]
+coop-contracts = { workspace = true }
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

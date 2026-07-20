@@ -26,3 +26,9 @@ python_version = "3.12"
 
 [tool.pytest.ini_options]
 testpaths = ["packages"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+]
