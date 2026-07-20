@@ -148,6 +148,19 @@ El operador puede desarrollar el hábito de responder "sí" sin verificar el res
 
 ---
 
+### R-12 — Meta restringe o bloquea la cuenta de WhatsApp sin verificar
+**Probabilidad:** M | **Impacto:** M
+
+Meta puede restringir una cuenta de WhatsApp Business sin verificar en cualquier momento, sin previo aviso, cortando el canal de notificación a socios.
+
+**Mitigación técnica:**
+1. Las notificaciones WhatsApp **nunca son bloqueantes**: la operación financiera ya fue persistida antes de intentar el envío. Un bloqueo de Meta no afecta la integridad de los datos.
+2. **Fallback `WaMeLinkNotificador`**: si Cloud API falla, el bot envía al operador (Telegram) un enlace `wa.me` con el texto pre-redactado. El operador lo abre y envía manualmente. Funciona sin cuenta de Meta.
+3. La interfaz `Notificador` hace que cambiar de implementación (CloudAPI → WaMe → Manual) sea un cambio de configuración, no de código.
+4. Riesgo residual aceptado: el fallback manual requiere acción del operador. Esto es conocido y aceptado.
+
+---
+
 ## Matriz de resumen
 
 | ID | Riesgo | P | I | Mecanismo técnico principal |
@@ -163,3 +176,4 @@ El operador puede desarrollar el hábito de responder "sí" sin verificar el res
 | R-09 | Caída de OpenAI/Whisper | M | M | Timeout + fallback a texto manual |
 | R-10 | Nombre mal transcrito | A | B | Fuzzy match calibrado + nombre real en confirmación |
 | R-11 | Confirmación sin leer | M | M | Formato visual + advertencia en montos grandes |
+| R-12 | Meta restringe cuenta WhatsApp | M | M | Notificaciones no bloqueantes + fallback wa.me |

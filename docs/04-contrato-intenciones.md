@@ -17,18 +17,19 @@
 
 ## Catálogo de intenciones
 
-| Intención | Servicio en coop-core | Requiere confirmación |
-|-----------|-----------------------|-----------------------|
-| `registrar_aporte` | `AporteService.register` | Sí |
-| `registrar_retiro` | `RetiroService.register` | Sí |
-| `registrar_pago` | `PagoService.register` | Sí |
-| `registrar_combinado` | `CombinadoService.register` | Sí |
-| `consultar_saldo` | `SociosRepository.get_balance` | No |
-| `consultar_cuotas` | `LiquidacionesRepository.find_pending` | No |
-| `consultar_caja` | `CajaService.get_saldo_caja` | No |
-| `desconocida` | — | No aplica |
-| `incompleta` | — | No aplica |
-| `ambigua` | — | No aplica |
+| Intención | Servicio en coop-core | Requiere confirmación | Genera documento |
+|-----------|-----------------------|-----------------------|-----------------|
+| `registrar_aporte` | `AporteService.register` | Sí | Recibo PDF |
+| `registrar_retiro` | `RetiroService.register` | Sí | Recibo PDF |
+| `registrar_pago` | `PagoService.register` | Sí | Recibo PDF |
+| `registrar_combinado` | `CombinadoService.register` | Sí | Recibo PDF |
+| `crear_credito` | `CreditoService.create` | Sí | Liquidación PDF |
+| `consultar_socio` | `SociosRepository.find_by_id` | No | — |
+| `consultar_cuotas` | `LiquidacionesRepository.find_pending` | No | — |
+| `consultar_caja` | `CajaService.get_saldo_caja` | No | — |
+| `desconocida` | — | No aplica | — |
+| `incompleta` | — | No aplica | — |
+| `ambigua` | — | No aplica | — |
 
 ---
 
@@ -37,6 +38,7 @@
 ```python
 from pydantic import BaseModel, Field, model_validator
 from typing import Literal, Annotated
+from datetime import date
 
 # ── Tipos base ──────────────────────────────────────────────────────────────
 
@@ -92,11 +94,20 @@ class IntRegCombinado(BaseModel):
             raise ValueError("Debe haber al menos un aporte o un pago")
         return self
 
+# ── Intención de nuevo crédito ───────────────────────────────────────────────
+
+class IntCrearCredito(BaseModel):
+    intencion: Literal["crear_credito"]
+    socios: list[str] = Field(..., min_length=1, description="Nombres de los socios titulares del crédito")
+    capital: Annotated[int, Field(gt=0)] = Field(..., description="Monto del crédito en pesos enteros")
+    n_cuotas: Annotated[int, Field(gt=0)] = Field(..., description="Número de cuotas mensuales")
+    # El LLM NUNCA completa interes_tasa — la tasa viene de la configuración del sistema
+
 # ── Intenciones de consulta ──────────────────────────────────────────────────
 
-class IntConsultarSaldo(BaseModel):
-    intencion: Literal["consultar_saldo"]
-    socio: str
+class IntConsultarSocio(BaseModel):
+    intencion: Literal["consultar_socio"]
+    socio: str  # nombre como fue dicho; el bot lo resuelve a ID
 
 class IntConsultarCuotas(BaseModel):
     intencion: Literal["consultar_cuotas"]
@@ -128,7 +139,8 @@ class IntAmbigua(BaseModel):
 from typing import Union
 Intencion = Union[
     IntRegAporte, IntRegRetiro, IntRegPago, IntRegCombinado,
-    IntConsultarSaldo, IntConsultarCuotas, IntConsultarCaja,
+    IntCrearCredito,
+    IntConsultarSocio, IntConsultarCuotas, IntConsultarCaja,
     IntDesconocida, IntIncompleta, IntAmbigua,
 ]
 ```
@@ -153,6 +165,7 @@ Intencion = Union[
 | `interes` calculado | ❌ Prohibido | `coop-core` |
 | `mora` calculada | ❌ Prohibido | `coop-core` |
 | `count_cobrables` | ❌ Prohibido | API (consulta lista de exentos en `coop-core`) |
+| `interes_tasa` (del crédito) | ❌ Prohibido | `coop-core` (viene de configuración del sistema) |
 
 ---
 
@@ -339,6 +352,60 @@ Si hay dos socios con nombres idénticos o muy similares, el bot **siempre** pre
   "aportes": [{"nombre": "Lucía", "monto": 80000}],
   "pagos": [{"nombre": "Alberto", "n_cuotas": 2, "abono_capital": 0}]
 }
+```
+
+---
+
+### `crear_credito`
+
+**Frase 1:** "Vamos a hacerle un crédito a Pedro Gómez de dos millones a 12 cuotas"
+```json
+{
+  "intencion": "crear_credito",
+  "socios": ["Pedro Gómez"],
+  "capital": 2000000,
+  "n_cuotas": 12
+}
+```
+
+**Frase 2:** "Don Héctor y su hijo van a sacar un préstamo de un millón quinientos a 10 meses"
+```json
+{
+  "intencion": "crear_credito",
+  "socios": ["Héctor", "hijo de Héctor"],
+  "capital": 1500000,
+  "n_cuotas": 10
+}
+```
+> "hijo de Héctor" no se puede resolver automáticamente → el bot pedirá desambiguación.
+
+**Frase 3:** "Carlos Ruiz necesita un crédito de ochocientos mil pagadero en 8 cuotas"
+```json
+{
+  "intencion": "crear_credito",
+  "socios": ["Carlos Ruiz"],
+  "capital": 800000,
+  "n_cuotas": 8
+}
+```
+
+---
+
+### `consultar_socio`
+
+**Frase 1:** "¿Cuánto tiene ahorrado Pedro Gómez?"
+```json
+{"intencion": "consultar_socio", "socio": "Pedro Gómez"}
+```
+
+**Frase 2:** "Dame los datos de la señora Rosa"
+```json
+{"intencion": "consultar_socio", "socio": "Rosa"}
+```
+
+**Frase 3:** "¿Cuál es el número de don Alberto?"
+```json
+{"intencion": "consultar_socio", "socio": "Alberto"}
 ```
 
 ---
