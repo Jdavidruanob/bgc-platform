@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from fastapi import HTTPException
-from fastapi.responses import JSONResponse
-
 from coop_contracts.respuestas import ErrorDetail, ErrorResponse
+from fastapi.responses import JSONResponse
 
 _VALUE_ERROR_CODES: dict[str, str] = {
     "saldo suficiente": "SALDO_INSUFICIENTE",

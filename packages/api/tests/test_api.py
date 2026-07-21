@@ -14,12 +14,20 @@ def _idem() -> dict:
 
 # ── Fixtures de datos ─────────────────────────────────────────────────────────
 
+
 @pytest.fixture()
 def socio_pedro(db_conn) -> int:
     from coop_core.repositories.socios_repo import SociosRepository
 
     repo = SociosRepository(db_conn)
-    sid = repo.save("Pedro Antonio", "Gómez Ruiz", "3001234567", None, saldo=320000, whatsapp_e164="+573001234567")
+    sid = repo.save(
+        "Pedro Antonio",
+        "Gómez Ruiz",
+        "3001234567",
+        None,
+        saldo=320000,
+        whatsapp_e164="+573001234567",
+    )
     db_conn.commit()
     return sid
 
@@ -54,6 +62,7 @@ def credito_pedro(db_conn, socio_pedro) -> int:
 
 # ── Health ────────────────────────────────────────────────────────────────────
 
+
 def test_health(client: TestClient):
     r = client.get("/health")
     assert r.status_code == 200
@@ -66,6 +75,7 @@ def test_endpoints_requieren_auth(client: TestClient, socio_pedro):
 
 
 # ── Socios ────────────────────────────────────────────────────────────────────
+
 
 def test_buscar_socios(client: TestClient, socio_pedro, db_conn):
     from coop_core.repositories.socios_repo import SociosRepository
@@ -112,6 +122,7 @@ def test_get_creditos_socio(client: TestClient, credito_pedro, socio_pedro):
 
 # ── Caja ──────────────────────────────────────────────────────────────────────
 
+
 def test_get_caja(client: TestClient):
     r = client.get("/caja", headers=AUTH)
     assert r.status_code == 200
@@ -121,6 +132,7 @@ def test_get_caja(client: TestClient):
 
 
 # ── Créditos / cuotas ─────────────────────────────────────────────────────────
+
 
 def test_get_cuotas_pendientes(client: TestClient, credito_pedro):
     r = client.get(f"/creditos/{credito_pedro}/cuotas-pendientes", headers=AUTH)
@@ -136,6 +148,7 @@ def test_get_cuotas_letra_inexistente(client: TestClient):
 
 
 # ── POST /operaciones/aportes ─────────────────────────────────────────────────
+
 
 def test_aporte_simple(client: TestClient, socio_pedro):
     r = client.post(
@@ -199,6 +212,7 @@ def test_aporte_socio_inexistente(client: TestClient, socio_pedro):
 
 # ── POST /operaciones/retiros ─────────────────────────────────────────────────
 
+
 def test_retiro_valido(client: TestClient, socio_pedro):
     r = client.post(
         "/operaciones/retiros",
@@ -223,12 +237,20 @@ def test_retiro_saldo_insuficiente(client: TestClient, socio_pedro):
 
 # ── POST /operaciones/pagos ───────────────────────────────────────────────────
 
+
 def test_pago_una_cuota(client: TestClient, socio_pedro, credito_pedro):
     r = client.post(
         "/operaciones/pagos",
         json={
             "recibi_de_id": socio_pedro,
-            "pagos": [{"socio_id": socio_pedro, "letra_id": credito_pedro, "n_cuotas": 1, "abono_capital": 0}],
+            "pagos": [
+                {
+                    "socio_id": socio_pedro,
+                    "letra_id": credito_pedro,
+                    "n_cuotas": 1,
+                    "abono_capital": 0,
+                }
+            ],
         },
         headers=_idem(),
     )
@@ -256,7 +278,14 @@ def test_pago_cuotas_insuficientes(client: TestClient, socio_pedro, credito_pedr
         "/operaciones/pagos",
         json={
             "recibi_de_id": socio_pedro,
-            "pagos": [{"socio_id": socio_pedro, "letra_id": credito_pedro, "n_cuotas": 99, "abono_capital": 0}],
+            "pagos": [
+                {
+                    "socio_id": socio_pedro,
+                    "letra_id": credito_pedro,
+                    "n_cuotas": 99,
+                    "abono_capital": 0,
+                }
+            ],
         },
         headers=_idem(),
     )
@@ -266,13 +295,21 @@ def test_pago_cuotas_insuficientes(client: TestClient, socio_pedro, credito_pedr
 
 # ── POST /operaciones/combinados ──────────────────────────────────────────────
 
+
 def test_combinado(client: TestClient, socio_pedro, socio_maria, credito_pedro):
     r = client.post(
         "/operaciones/combinados",
         json={
             "recibi_de_id": socio_pedro,
             "aportes": [{"socio_id": socio_maria, "monto": 80000}],
-            "pagos": [{"socio_id": socio_pedro, "letra_id": credito_pedro, "n_cuotas": 1, "abono_capital": 0}],
+            "pagos": [
+                {
+                    "socio_id": socio_pedro,
+                    "letra_id": credito_pedro,
+                    "n_cuotas": 1,
+                    "abono_capital": 0,
+                }
+            ],
         },
         headers=_idem(),
     )
@@ -283,6 +320,7 @@ def test_combinado(client: TestClient, socio_pedro, socio_maria, credito_pedro):
 
 
 # ── Notificaciones ────────────────────────────────────────────────────────────
+
 
 def test_notificaciones_pendientes_vacias(client: TestClient):
     r = client.get("/notificaciones/pendientes", headers=AUTH)
@@ -321,6 +359,7 @@ def test_patch_notificacion(client: TestClient, socio_pedro, db_conn):
 
 
 # ── Fuzzy search unitario ─────────────────────────────────────────────────────
+
 
 def test_fuzzy_score():
     from coop_api.fuzzy import score_nombre

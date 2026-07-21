@@ -1,6 +1,4 @@
 import pytest
-from pydantic import ValidationError
-
 from coop_contracts.intenciones import (
     AporteItem,
     IntAmbigua,
@@ -13,6 +11,7 @@ from coop_contracts.intenciones import (
     IntRegRetiro,
     PagoItem,
 )
+from pydantic import ValidationError
 
 
 class TestAporteItem:

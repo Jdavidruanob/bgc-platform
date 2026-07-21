@@ -95,9 +95,16 @@ class PagoService:
 
             for op in ops_pendientes:
                 saldo_caja, mora_total = execute_pago_op(
-                    cursor, self._liquidaciones, self._auxiliar,
-                    op, recibo_id, fecha, saldo_caja, mora_total,
-                    pagos_para_recibo, reporte_global,
+                    cursor,
+                    self._liquidaciones,
+                    self._auxiliar,
+                    op,
+                    recibo_id,
+                    fecha,
+                    saldo_caja,
+                    mora_total,
+                    pagos_para_recibo,
+                    reporte_global,
                 )
 
             self._config.set("saldo_en_caja", str(saldo_caja))

@@ -1,6 +1,5 @@
-from fastapi import APIRouter
-
 from coop_contracts.respuestas import HealthOk
+from fastapi import APIRouter
 
 router = APIRouter()
 

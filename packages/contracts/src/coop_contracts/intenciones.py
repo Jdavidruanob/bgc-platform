@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -20,7 +20,7 @@ class PagoItem(BaseModel):
     abono_capital: Annotated[int, Field(ge=0)] = 0
 
     @model_validator(mode="after")
-    def validar_modo_pago(self) -> "PagoItem":
+    def validar_modo_pago(self) -> PagoItem:
         if self.n_cuotas > 0 and self.abono_capital > 0:
             raise ValueError("n_cuotas y abono_capital son excluyentes")
         if self.n_cuotas == 0 and self.abono_capital == 0:
@@ -53,7 +53,7 @@ class IntRegCombinado(BaseModel):
     pagos: list[PagoItem]
 
     @model_validator(mode="after")
-    def al_menos_una_operacion(self) -> "IntRegCombinado":
+    def al_menos_una_operacion(self) -> IntRegCombinado:
         if not self.aportes and not self.pagos:
             raise ValueError("Debe haber al menos un aporte o un pago")
         return self
@@ -99,16 +99,16 @@ class IntAmbigua(BaseModel):
     texto_original: str
 
 
-Intencion = Union[
-    IntRegAporte,
-    IntRegRetiro,
-    IntRegPago,
-    IntRegCombinado,
-    IntCrearCredito,
-    IntConsultarSocio,
-    IntConsultarCuotas,
-    IntConsultarCaja,
-    IntDesconocida,
-    IntIncompleta,
-    IntAmbigua,
-]
+Intencion = (
+    IntRegAporte
+    | IntRegRetiro
+    | IntRegPago
+    | IntRegCombinado
+    | IntCrearCredito
+    | IntConsultarSocio
+    | IntConsultarCuotas
+    | IntConsultarCaja
+    | IntDesconocida
+    | IntIncompleta
+    | IntAmbigua
+)

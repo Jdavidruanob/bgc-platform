@@ -2,7 +2,6 @@ from datetime import date
 from typing import Any
 
 import pytest
-
 from coop_core.services.combinado_service import CombinadoService
 from coop_core.services.credito_service import CreditoService
 from coop_core.utils import fecha as fecha_mod
@@ -26,8 +25,11 @@ def _setup_credito(repos: dict[str, Any], sid: int, capital: int, n_cuotas: int)
     repos["config"].set("saldo_en_caja", str(capital + 500_000))
     repos["conn"].commit()
     result = _make_credito(repos).create(
-        socio_ids=[sid], capital=capital, interes_tasa=0.02,
-        n_cuotas=n_cuotas, socios_data=[{"id": sid, "nombres": "T", "apellidos": "S"}],
+        socio_ids=[sid],
+        capital=capital,
+        interes_tasa=0.02,
+        n_cuotas=n_cuotas,
+        socios_data=[{"id": sid, "nombres": "T", "apellidos": "S"}],
         fecha_inicio=date(2024, 1, 1),
     )
     return int(result["letra_id"])

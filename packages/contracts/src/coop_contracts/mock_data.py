@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-from datetime import date
 
 SOCIOS_INICIALES: list[dict] = [
     {

@@ -1,7 +1,6 @@
 from typing import Any
 
 import pytest
-
 from coop_core.services.retiro_service import RetiroService
 
 

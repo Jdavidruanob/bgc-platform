@@ -1,3 +1,4 @@
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -7,7 +8,7 @@ from coop_api.routers import caja, creditos, health, notificaciones, operaciones
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
 
 
@@ -25,5 +26,11 @@ app.include_router(notificaciones.router)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(
         status_code=500,
-        content={"error": {"codigo": "ERROR_INTERNO", "mensaje": "Error interno del servidor.", "detalle": None}},
+        content={
+            "error": {
+                "codigo": "ERROR_INTERNO",
+                "mensaje": "Error interno del servidor.",
+                "detalle": None,
+            }
+        },
     )

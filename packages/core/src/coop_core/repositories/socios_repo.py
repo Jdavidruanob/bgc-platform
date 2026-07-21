@@ -18,7 +18,7 @@ class SociosRepository:
             GROUP BY s.id
             ORDER BY s.nombres
         """)
-        return [dict(zip([d[0] for d in cursor.description], row)) for row in cursor.fetchall()]
+        return [dict(zip([d[0] for d in cursor.description], row, strict=False)) for row in cursor.fetchall()]
 
     def find_all_full(self) -> list[dict[str, Any]]:
         cursor = self._conn.cursor()
@@ -30,7 +30,7 @@ class SociosRepository:
             ORDER BY s.nombres
         """)
         cols = [d[0] for d in cursor.description]
-        return [dict(zip(cols, row)) for row in cursor.fetchall()]
+        return [dict(zip(cols, row, strict=False)) for row in cursor.fetchall()]
 
     def find_by_id(self, member_id: int) -> dict[str, Any] | None:
         cursor = self._conn.cursor()
@@ -44,7 +44,7 @@ class SociosRepository:
         if row is None:
             return None
         cols = [d[0] for d in cursor.description]
-        return dict(zip(cols, row))
+        return dict(zip(cols, row, strict=False))
 
     def search_by_name(self, search_term: str) -> list[dict[str, Any]]:
         cursor = self._conn.cursor()
@@ -62,7 +62,7 @@ class SociosRepository:
             (f"%{search_term}%", f"%{search_term}%"),
         )
         cols = [d[0] for d in cursor.description]
-        return [dict(zip(cols, row)) for row in cursor.fetchall()]
+        return [dict(zip(cols, row, strict=False)) for row in cursor.fetchall()]
 
     def get_balance(self, member_id: int) -> int:
         cursor = self._conn.cursor()

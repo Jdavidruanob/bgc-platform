@@ -6,6 +6,7 @@ from dateutil.relativedelta import relativedelta
 
 def calculate_mora(fecha_venc_str: str, hoy: date, valor_cuota: int, tasa_mora: float) -> int:
     from datetime import datetime
+
     f_venc = datetime.strptime(fecha_venc_str, "%Y-%m-%d").date()
     f_limite = f_venc + relativedelta(months=+1)
     return int(valor_cuota * tasa_mora) if hoy > f_limite else 0
@@ -42,9 +43,16 @@ def build_amortization_schedule(
         int_mes = int(round(saldo * interes))
         cuota_mensual = int(cap_pago + int_mes)
         saldo_final = max(int(saldo - cap_pago), 0)
-        rows.append((
-            letra_id, nro, fecha_venc.strftime("%Y-%m-%d"),
-            int(cap_pago), int_mes, cuota_mensual, saldo_final,
-        ))
+        rows.append(
+            (
+                letra_id,
+                nro,
+                fecha_venc.strftime("%Y-%m-%d"),
+                int(cap_pago),
+                int_mes,
+                cuota_mensual,
+                saldo_final,
+            )
+        )
         saldo = saldo_final
     return rows

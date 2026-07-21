@@ -1,6 +1,3 @@
-from fastapi import APIRouter, Query
-from fastapi.responses import JSONResponse
-
 from coop_contracts.respuestas import (
     CreditoResumen,
     CreditosResponse,
@@ -10,6 +7,8 @@ from coop_contracts.respuestas import (
 )
 from coop_core.repositories.creditos_repo import CreditosRepository
 from coop_core.repositories.socios_repo import SociosRepository
+from fastapi import APIRouter, Query
+from fastapi.responses import JSONResponse
 
 from coop_api.deps import AuthDep, DbDep
 from coop_api.errors import not_found
@@ -27,13 +26,14 @@ def buscar(
 ) -> SociosSearchResponse | JSONResponse:
     if not q.strip():
         from coop_api.errors import bad_request
+
         return bad_request("El parámetro 'q' es requerido y no puede estar vacío.")
     socios_repo = SociosRepository(db)
     todos = socios_repo.find_all_full()
     resultados = buscar_socios(todos, q, limit=limit)
     items = [
         SocioSearchItem(
-            id=int(s["id"]),
+            id=int(str(s["id"])),
             nombres=str(s["nombres"]),
             apellidos=str(s["apellidos"]),
             nombre_completo=f"{s['nombres']} {s['apellidos']}",

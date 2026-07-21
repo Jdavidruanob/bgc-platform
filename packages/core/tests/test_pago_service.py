@@ -2,7 +2,6 @@ from datetime import date
 from typing import Any
 
 import pytest
-
 from coop_core.services.amortization import calculate_mora
 from coop_core.services.credito_service import CreditoService
 from coop_core.services.pago_service import PagoService
@@ -28,8 +27,12 @@ def _setup_credito(repos: dict[str, Any], sid: int, capital: int, n_cuotas: int)
     repos["conn"].commit()
     sd = [{"id": sid, "nombres": "Test", "apellidos": "Socio"}]
     result = _make_credito(repos).create(
-        socio_ids=[sid], capital=capital, interes_tasa=0.02,
-        n_cuotas=n_cuotas, socios_data=sd, fecha_inicio=date(2024, 1, 1),
+        socio_ids=[sid],
+        capital=capital,
+        interes_tasa=0.02,
+        n_cuotas=n_cuotas,
+        socios_data=sd,
+        fecha_inicio=date(2024, 1, 1),
     )
     return int(result["letra_id"])
 
