@@ -50,9 +50,7 @@ def test_cloud_api_notificador_rechazado_por_meta_no_es_exitoso() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(400, json={"error": {"message": "Recipient not on WhatsApp"}})
 
-    notificador = CloudApiNotificador(
-        token="t", phone_number_id="1", transport=httpx.MockTransport(handler)
-    )
+    notificador = CloudApiNotificador(token="t", phone_number_id="1", transport=httpx.MockTransport(handler))
     resultado = notificador.enviar("+573112223344", "hola")
 
     assert resultado.exitoso is False
@@ -65,9 +63,7 @@ def test_cloud_api_notificador_error_de_red_no_es_exitoso() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("boom", request=request)
 
-    notificador = CloudApiNotificador(
-        token="t", phone_number_id="1", transport=httpx.MockTransport(handler)
-    )
+    notificador = CloudApiNotificador(token="t", phone_number_id="1", transport=httpx.MockTransport(handler))
     resultado = notificador.enviar("+573112223344", "hola")
 
     assert resultado.exitoso is False
@@ -132,7 +128,5 @@ def test_construir_notificador_sin_credenciales_meta_usa_solo_wa_me() -> None:
 
 
 def test_construir_notificador_con_credenciales_meta_usa_fallback_compuesto() -> None:
-    notificador = construir_notificador(
-        _config(whatsapp_cloud_api_token="t", whatsapp_phone_number_id="1")
-    )
+    notificador = construir_notificador(_config(whatsapp_cloud_api_token="t", whatsapp_phone_number_id="1"))
     assert isinstance(notificador, NotificadorConFallback)

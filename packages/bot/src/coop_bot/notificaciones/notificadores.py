@@ -15,7 +15,7 @@ from __future__ import annotations
 import urllib.parse
 
 import httpx
-from coop_contracts.notificador import (  # type: ignore[import-untyped]
+from coop_contracts.notificador import (
     Notificador,
     ResultadoEnvio,
 )
@@ -60,16 +60,12 @@ class CloudApiNotificador:
             "text": {"body": texto},
         }
         try:
-            respuesta = self._client.post(
-                f"/{self._VERSION}/{self._phone_number_id}/messages", json=payload
-            )
+            respuesta = self._client.post(f"/{self._VERSION}/{self._phone_number_id}/messages", json=payload)
         except httpx.HTTPError as exc:
             return ResultadoEnvio(exitoso=False, canal="cloud_api", error=str(exc))
 
         if respuesta.is_error:
-            return ResultadoEnvio(
-                exitoso=False, canal="cloud_api", error=_extraer_error_meta(respuesta)
-            )
+            return ResultadoEnvio(exitoso=False, canal="cloud_api", error=_extraer_error_meta(respuesta))
         return ResultadoEnvio(exitoso=True, canal="cloud_api")
 
     def cerrar(self) -> None:
@@ -86,9 +82,7 @@ class WaMeLinkNotificador:
     def enviar(self, numero_e164: str, texto: str) -> ResultadoEnvio:
         numero = numero_e164.removeprefix("+").strip()
         if not numero:
-            return ResultadoEnvio(
-                exitoso=False, canal="wa_me_link", error="Número de WhatsApp vacío"
-            )
+            return ResultadoEnvio(exitoso=False, canal="wa_me_link", error="Número de WhatsApp vacío")
         url = f"https://wa.me/{numero}?text={urllib.parse.quote(texto)}"
         return ResultadoEnvio(exitoso=True, canal="wa_me_link", wa_me_url=url)
 

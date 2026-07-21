@@ -5,7 +5,7 @@ from __future__ import annotations
 import io
 from dataclasses import dataclass, field
 
-from coop_contracts.respuestas import (  # type: ignore[import-untyped]
+from coop_contracts.respuestas import (
     AportesResponse,
     CombinadoResponse,
     CuotaPendiente,
@@ -13,8 +13,8 @@ from coop_contracts.respuestas import (  # type: ignore[import-untyped]
     PagosResponse,
     RetiroResponse,
 )
-from reportlab.lib.pagesizes import letter  # type: ignore[import-untyped]
-from reportlab.pdfgen import canvas  # type: ignore[import-untyped]
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 
 from coop_bot.dialogo.resumen import formatear_monto
 
@@ -45,9 +45,7 @@ class ReciboData:
 
 
 def recibo_desde_aportes(resp: AportesResponse) -> ReciboData:
-    lineas = [
-        LineaRecibo(socio=a.nombre_completo, concepto="Aporte", monto=a.monto) for a in resp.aportes
-    ]
+    lineas = [LineaRecibo(socio=a.nombre_completo, concepto="Aporte", monto=a.monto) for a in resp.aportes]
     total = sum(a.monto for a in resp.aportes)
     return ReciboData(
         recibo_id=resp.recibo_id,
@@ -99,9 +97,7 @@ def recibo_desde_pagos(resp: PagosResponse) -> ReciboData:
 
 
 def recibo_desde_combinado(resp: CombinadoResponse) -> ReciboData:
-    lineas = [
-        LineaRecibo(socio=a.nombre_completo, concepto="Aporte", monto=a.monto) for a in resp.aportes
-    ]
+    lineas = [LineaRecibo(socio=a.nombre_completo, concepto="Aporte", monto=a.monto) for a in resp.aportes]
     lineas += [
         LineaRecibo(socio=p.nombre_completo, concepto=_concepto_pago(p), monto=p.total_pagado)
         for p in resp.pagos
@@ -156,9 +152,7 @@ def generar_pdf_recibo(datos: ReciboData) -> bytes:
     return buffer.getvalue()
 
 
-def generar_pdf_tabla_cuotas(
-    letra_id: int, cuotas: list[CuotaPendiente], deuda_total: int
-) -> bytes:
+def generar_pdf_tabla_cuotas(letra_id: int, cuotas: list[CuotaPendiente], deuda_total: int) -> bytes:
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
     y: float = _Y_INICIAL

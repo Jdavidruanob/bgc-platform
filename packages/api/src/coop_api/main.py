@@ -1,14 +1,28 @@
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from coop_api.postgres_schema import CONFIG_DEFAULTS, SCHEMA_POSTGRES
 from coop_api.routers import caja, creditos, health, notificaciones, operaciones, socios
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    db_url = os.environ.get("DATABASE_URL", "")
+    if db_url:
+        import psycopg
+
+        with psycopg.connect(db_url) as conn:
+            conn.execute(SCHEMA_POSTGRES)
+            for key, value in CONFIG_DEFAULTS.items():
+                conn.execute(
+                    "INSERT INTO config (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING",
+                    (key, value),
+                )
+            conn.commit()
     yield
 
 

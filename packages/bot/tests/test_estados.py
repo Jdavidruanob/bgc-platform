@@ -103,9 +103,7 @@ async def test_consultar_socio_homonimos_dispara_desambiguacion(api_client: ApiC
 async def test_consultar_cuotas_con_letra_hint(api_client: ApiClient) -> None:
     maquina = _maquina(api_client)
     respuesta = await maquina.procesar_intencion(
-        IntConsultarCuotas(
-            intencion="consultar_cuotas", socio="Hernando Ruiz Vargas", letra_id_hint="451"
-        )
+        IntConsultarCuotas(intencion="consultar_cuotas", socio="Hernando Ruiz Vargas", letra_id_hint="451")
     )
 
     assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from importlib import resources
 
-from coop_contracts.intenciones import (  # type: ignore[import-untyped]
+from coop_contracts.intenciones import (
     IntDesconocida,
     Intencion,
 )
@@ -16,9 +16,7 @@ _INTENCION_ADAPTER: TypeAdapter[Intencion] = TypeAdapter(Intencion)
 
 
 def _cargar_prompt_sistema() -> str:
-    return (
-        resources.files("coop_bot.nlu").joinpath("prompt_sistema.txt").read_text(encoding="utf-8")
-    )
+    return resources.files("coop_bot.nlu").joinpath("prompt_sistema.txt").read_text(encoding="utf-8")
 
 
 class LlmClient:

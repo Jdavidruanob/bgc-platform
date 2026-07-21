@@ -25,9 +25,7 @@ async def test_transcribir_devuelve_el_texto(mocker: MockerFixture) -> None:
 async def test_transcribir_usa_el_modelo_configurado(mocker: MockerFixture) -> None:
     mock_openai_cls = mocker.patch("coop_bot.nlu.whisper_client.AsyncOpenAI")
     mock_instancia = mock_openai_cls.return_value
-    mock_instancia.audio.transcriptions.create = AsyncMock(
-        return_value=SimpleNamespace(text="texto")
-    )
+    mock_instancia.audio.transcriptions.create = AsyncMock(return_value=SimpleNamespace(text="texto"))
 
     cliente = WhisperClient(api_key="sk-test", modelo="whisper-otro")
     await cliente.transcribir(b"audio")

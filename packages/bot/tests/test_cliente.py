@@ -61,9 +61,7 @@ async def test_sin_token_lanza_api_error_401(mock_transport) -> None:
 async def test_post_sin_idempotency_key_lanza_400(api_client: ApiClient) -> None:
     # _post siempre manda el header; forzamos un envío directo sin él para
     # cubrir el mismo shape de error de string plano que devuelve el mock.
-    response = await api_client._client.post(
-        "/operaciones/retiros", json={"socio_id": 1, "monto": 1000}
-    )
+    response = await api_client._client.post("/operaciones/retiros", json={"socio_id": 1, "monto": 1000})
     assert response.status_code == 400
 
 
@@ -155,9 +153,7 @@ async def test_error_500_se_muestra_en_espanol_sin_stacktrace() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(500, text="Internal Server Error")
 
-    client = ApiClient(
-        base_url="http://mock", token="mock-secret", transport=httpx.MockTransport(handler)
-    )
+    client = ApiClient(base_url="http://mock", token="mock-secret", transport=httpx.MockTransport(handler))
     try:
         with pytest.raises(ApiError) as exc_info:
             await client.get_caja()

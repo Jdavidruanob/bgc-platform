@@ -5,13 +5,14 @@ Descarga audio, llama a Whisper/NLU, y delega toda la lógica de negocio a
 `coop_contracts` más allá de lo que `dialogo.estados` expone.
 """
 
+# mypy: disable-error-code="type-arg"
 from __future__ import annotations
 
 import io
 import logging
 from typing import cast
 
-from coop_contracts.notificador import Notificador  # type: ignore[import-untyped]
+from coop_contracts.notificador import Notificador
 from telegram import InputFile, Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
@@ -34,14 +35,14 @@ _CLAVE_SESION = "sesion"
 _INTERVALO_NOTIFICACIONES_SEGUNDOS = 60
 
 
-def registrar_handlers(application: Application) -> None:  # type: ignore[type-arg]
+def registrar_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("start", on_start))
     application.add_handler(CommandHandler("cancelar", on_cancelar))
     application.add_handler(MessageHandler(filters.VOICE, on_voice))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
 
 
-def registrar_jobs(application: Application) -> None:  # type: ignore[type-arg]
+def registrar_jobs(application: Application) -> None:
     """Procesa la cola de notificaciones pendientes en segundo plano.
 
     Nunca bloquea el flujo conversacional (ver ADR-010) — corre como job
@@ -125,9 +126,7 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 # ── Orquestación ─────────────────────────────────────────────────────────────
 
 
-async def _procesar_texto_entrante(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, texto: str
-) -> None:
+async def _procesar_texto_entrante(update: Update, context: ContextTypes.DEFAULT_TYPE, texto: str) -> None:
     chat_id = _chat_id(update)
     sesion = _obtener_sesion(context, chat_id)
     maquina = MaquinaEstados(sesion, _api_client(context))
@@ -141,9 +140,7 @@ async def _procesar_texto_entrante(
             intencion = await _llm_client(context).interpretar(texto)
         except Exception:  # noqa: BLE001 - cualquier falla del LLM es recuperable
             logger.exception("Fallo al interpretar mensaje del chat %s", chat_id)
-            await enviar_texto(
-                context, chat_id, "No pude interpretar tu mensaje, intenta de nuevo."
-            )
+            await enviar_texto(context, chat_id, "No pude interpretar tu mensaje, intenta de nuevo.")
             return
         respuesta = await maquina.procesar_intencion(intencion)
     else:
@@ -153,9 +150,7 @@ async def _procesar_texto_entrante(
     await _responder(context, chat_id, respuesta)
 
 
-async def _responder(
-    context: ContextTypes.DEFAULT_TYPE, chat_id: int, respuesta: RespuestaDialogo
-) -> None:
+async def _responder(context: ContextTypes.DEFAULT_TYPE, chat_id: int, respuesta: RespuestaDialogo) -> None:
     await enviar_texto(context, chat_id, respuesta.texto)
     if respuesta.documento_pdf is not None and respuesta.nombre_documento is not None:
         await enviar_pdf(context, chat_id, respuesta.documento_pdf, respuesta.nombre_documento)
@@ -208,9 +203,7 @@ def _programar_timeout(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None
     if job_queue is None:
         return
     _cancelar_timeout(context, chat_id)
-    job_queue.run_once(
-        _on_timeout_job, when=TIMEOUT_SEGUNDOS, chat_id=chat_id, name=_nombre_job(chat_id)
-    )
+    job_queue.run_once(_on_timeout_job, when=TIMEOUT_SEGUNDOS, chat_id=chat_id, name=_nombre_job(chat_id))
 
 
 def _cancelar_timeout(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
@@ -262,10 +255,10 @@ def _config(context: ContextTypes.DEFAULT_TYPE) -> Config:
 
 def _chat_id(update: Update) -> int:
     assert update.effective_chat is not None
-    return update.effective_chat.id
+    return int(update.effective_chat.id)
 
 
 def _es_operador(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     if update.effective_chat is None:
         return False
-    return update.effective_chat.id == _config(context).telegram_operador_chat_id
+    return bool(update.effective_chat.id == _config(context).telegram_operador_chat_id)

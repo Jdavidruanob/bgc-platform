@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
-from coop_contracts.respuestas import (  # type: ignore[import-untyped]
+from coop_contracts.respuestas import (
     CreditoResumen,
     SocioSearchItem,
 )
@@ -62,9 +62,7 @@ async def resolver_socio(cliente: ApiClient, nombre: str) -> ResolucionSocio:
     return ResolucionSocio(query=nombre, estado="ambiguo", candidatos=candidatos)
 
 
-async def resolver_letra(
-    cliente: ApiClient, socio_id: int, letra_hint: str | None
-) -> ResolucionLetra:
+async def resolver_letra(cliente: ApiClient, socio_id: int, letra_hint: str | None) -> ResolucionLetra:
     if letra_hint is not None:
         letra_id = _parsear_letra_hint(letra_hint)
         if letra_id is not None:

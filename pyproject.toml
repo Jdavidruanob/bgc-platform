@@ -25,6 +25,10 @@ strict = true
 python_version = "3.12"
 exclude = ["mock_server\\.py", "mock_data\\.py", "conftest\\.py"]
 
+[[tool.mypy.overrides]]
+module = ["openai", "openai.*", "telegram", "telegram.*", "reportlab", "reportlab.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["packages"]
 

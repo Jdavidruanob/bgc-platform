@@ -13,8 +13,8 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 
-from coop_contracts.notificador import Notificador  # type: ignore[import-untyped]
-from coop_contracts.respuestas import NotificacionPendiente  # type: ignore[import-untyped]
+from coop_contracts.notificador import Notificador
+from coop_contracts.respuestas import NotificacionPendiente
 
 from coop_bot.api.cliente import ApiClient, ApiError
 
@@ -50,13 +50,9 @@ async def _procesar_una(
     resumen: ResumenProcesamiento,
 ) -> None:
     try:
-        resultado = await asyncio.to_thread(
-            notificador.enviar, notificacion.numero_e164, notificacion.texto
-        )
+        resultado = await asyncio.to_thread(notificador.enviar, notificacion.numero_e164, notificacion.texto)
     except Exception as exc:  # noqa: BLE001 - cualquier fallo del canal es recuperable
-        logger.exception(
-            "El notificador lanzó una excepción para la notificación %s", notificacion.id
-        )
+        logger.exception("El notificador lanzó una excepción para la notificación %s", notificacion.id)
         await _marcar(cliente, notificacion.id, "fallida", str(exc), resumen)
         return
 

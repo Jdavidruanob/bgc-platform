@@ -1,0 +1,36 @@
+# fly.toml — coop-api staging
+# Deploy: fly deploy --config fly.toml
+# Secrets: fly secrets set DATABASE_URL="..." API_SECRET_TOKEN="..."
+
+app = "coop-api-staging"
+primary_region = "bog"      # Bogotá — la región más cercana a Colombia en Fly.io
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+
+[[services]]
+  internal_port = 8080
+  protocol      = "tcp"
+
+  [[services.ports]]
+    handlers = ["http"]
+    port     = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port     = 443
+
+  [[services.http_checks]]
+    interval      = 30000   # ms
+    timeout       = 5000
+    grace_period  = "10s"
+    method        = "GET"
+    path          = "/health"
+
+[vm]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1

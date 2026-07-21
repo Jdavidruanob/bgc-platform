@@ -38,9 +38,7 @@ async def test_interpretar_registrar_aporte(mocker: MockerFixture) -> None:
 
 
 async def test_interpretar_registrar_retiro(mocker: MockerFixture) -> None:
-    contenido = json.dumps(
-        {"intencion": "registrar_retiro", "socio": "María López", "monto": 200000}
-    )
+    contenido = json.dumps({"intencion": "registrar_retiro", "socio": "María López", "monto": 200000})
     _mock_create(mocker, contenido)
 
     cliente = LlmClient(api_key="sk-test")
