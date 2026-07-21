@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint & format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages
+      - run: uv run ruff check packages/
+      - run: uv run ruff format --check packages/
+
+  typecheck:
+    name: Typecheck (mypy --strict)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages
+      - run: |
+          uv run mypy packages/core/src \
+                       packages/contracts/src \
+                       packages/api/src \
+                       packages/bot/src \
+                       --strict
+
+  test-core:
+    name: Tests coop-core
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages
+      - run: uv run pytest packages/core --cov=coop_core --cov-fail-under=90
+
+  test-contracts:
+    name: Tests coop-contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages
+      - run: uv run pytest packages/contracts
+
+  test-api:
+    name: Tests coop-api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages
+      - run: uv run pytest packages/api --cov=coop_api --cov-fail-under=75
+
+  test-bot:
+    name: Tests coop-bot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages
+      - run: uv run pytest packages/bot --cov=coop_bot --cov-fail-under=70
