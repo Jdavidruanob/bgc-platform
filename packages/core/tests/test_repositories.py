@@ -1,20 +1,21 @@
 """Tests directos de métodos de repositorios no cubiertos por los servicios."""
+
 from datetime import date
 from typing import Any
-
-import pytest
 
 from coop_core.services.amortization import build_amortization_schedule
 
 
-def _insert_socio(repos: dict[str, Any], nombres: str = "Ana", apellidos: str = "Perez", saldo: int = 0) -> int:
+def _insert_socio(
+    repos: dict[str, Any], nombres: str = "Ana", apellidos: str = "Perez", saldo: int = 0
+) -> int:
     return repos["socios"].save(nombres, apellidos, None, None, saldo)
 
 
-def _insert_credito_completo(repos: dict[str, Any], sid: int, capital: int = 600_000, n_cuotas: int = 6) -> int:
-    letra_id = repos["creditos"].create(
-        [sid], capital, 0.02, n_cuotas, "2024-01-01"
-    )
+def _insert_credito_completo(
+    repos: dict[str, Any], sid: int, capital: int = 600_000, n_cuotas: int = 6
+) -> int:
+    letra_id = repos["creditos"].create([sid], capital, 0.02, n_cuotas, "2024-01-01")
     cuotas = build_amortization_schedule(letra_id, capital, 0.02, n_cuotas, date(2024, 1, 1))
     repos["liquidaciones"].save_all(cuotas)
     repos["conn"].commit()
@@ -22,6 +23,7 @@ def _insert_credito_completo(repos: dict[str, Any], sid: int, capital: int = 600
 
 
 # ─── SociosRepository ─────────────────────────────────────────────────────────
+
 
 def test_socios_find_all_empty(repos: dict[str, Any]) -> None:
     assert repos["socios"].find_all() == []
@@ -81,6 +83,7 @@ def test_socios_update(repos: dict[str, Any]) -> None:
 
 # ─── CreditosRepository ───────────────────────────────────────────────────────
 
+
 def test_creditos_find_by_letra(repos: dict[str, Any]) -> None:
     sid = _insert_socio(repos, "Hugo", "Perez")
     letra = _insert_credito_completo(repos, sid, 500_000, 5)
@@ -128,6 +131,7 @@ def test_creditos_update_no_cuotas(repos: dict[str, Any]) -> None:
 
 # ─── LiquidacionesRepository ──────────────────────────────────────────────────
 
+
 def test_liquidaciones_get_total_cuotas(repos: dict[str, Any]) -> None:
     sid = _insert_socio(repos, "F", "G")
     letra = _insert_credito_completo(repos, sid, 600_000, 6)
@@ -173,7 +177,10 @@ def test_liquidaciones_get_current_debt_no_rows(repos: dict[str, Any]) -> None:
 
 # ─── LiquidacionesRepository.recalculate_amortization ────────────────────────
 
-def _pay_cuota(repos: dict[str, Any], letra_id: int, nro_cuota: int, monto: int, recibo_id: int, socio_id: int) -> None:
+
+def _pay_cuota(
+    repos: dict[str, Any], letra_id: int, nro_cuota: int, monto: int, recibo_id: int, socio_id: int
+) -> None:
     cur = repos["conn"].cursor()
     cur.execute(
         "UPDATE liquidaciones SET fecha_pago = '2024-04-01' WHERE credito_letra = ? AND nro_cuota = ?",
@@ -279,6 +286,7 @@ def test_recalculate_amortization_with_future_cuotas(repos: dict[str, Any]) -> N
 
 # ─── RecibosRepository ────────────────────────────────────────────────────────
 
+
 def test_recibos_create(repos: dict[str, Any]) -> None:
     sid = _insert_socio(repos, "R", "S")
     recibo_id = repos["recibos"].create(sid)
@@ -300,6 +308,7 @@ def test_recibos_find_by_id_not_found(repos: dict[str, Any]) -> None:
 
 
 # ─── AuxiliarRepository ───────────────────────────────────────────────────────
+
 
 def test_auxiliar_find_all_empty(repos: dict[str, Any]) -> None:
     assert repos["auxiliar"].find_all() == []
@@ -329,7 +338,7 @@ def test_auxiliar_find_all_with_filters(repos: dict[str, Any]) -> None:
 
 def test_auxiliar_find_all_pagination(repos: dict[str, Any]) -> None:
     for i in range(5):
-        repos["auxiliar"].add(f"2024-01-{i+1:02d}", "Aporte", f"Socio {i}", 1000, 1000)
+        repos["auxiliar"].add(f"2024-01-{i + 1:02d}", "Aporte", f"Socio {i}", 1000, 1000)
     repos["conn"].commit()
     page1 = repos["auxiliar"].find_all(limit=3, offset=0)
     page2 = repos["auxiliar"].find_all(limit=3, offset=3)

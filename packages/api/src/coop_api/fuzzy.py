@@ -18,15 +18,12 @@ def score_nombre(query: str, nombres: str, apellidos: str) -> float:
 
 
 def buscar_socios(
-    socios: list[dict],
+    socios: list[dict[str, object]],
     query: str,
     limit: int = 10,
     umbral: float = 0.50,
-) -> list[tuple[dict, float]]:
-    resultados = [
-        (s, score_nombre(query, s["nombres"], s["apellidos"]))
-        for s in socios
-    ]
+) -> list[tuple[dict[str, object], float]]:
+    resultados = [(s, score_nombre(query, str(s["nombres"]), str(s["apellidos"]))) for s in socios]
     resultados = [(s, sc) for s, sc in resultados if sc >= umbral]
     resultados.sort(key=lambda x: x[1], reverse=True)
     return resultados[:limit]

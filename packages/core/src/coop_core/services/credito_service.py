@@ -56,9 +56,7 @@ class CreditoService:
             saldo_actual = self._config.get_int("saldo_en_caja")
             nuevo_saldo_caja = saldo_actual - capital
 
-            nombres_str = ", ".join(
-                f"{s['nombres']} {s['apellidos']}" for s in socios_data
-            )
+            nombres_str = ", ".join(f"{s['nombres']} {s['apellidos']}" for s in socios_data)
             self._auxiliar.add(
                 fecha=fecha_str,
                 tipo="Nuevo Credito",
@@ -88,7 +86,11 @@ class CreditoService:
                 "letra_id": letra_id,
                 "fecha": fecha_str,
                 "socios": [
-                    {"id": int(s["id"]), "nombres": str(s["nombres"]), "apellidos": str(s["apellidos"])}
+                    {
+                        "id": int(s["id"]),
+                        "nombres": str(s["nombres"]),
+                        "apellidos": str(s["apellidos"]),
+                    }
                     for s in socios_data
                 ],
                 "capital": capital,

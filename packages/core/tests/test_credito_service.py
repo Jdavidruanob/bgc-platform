@@ -2,7 +2,6 @@ from datetime import date
 from typing import Any
 
 import pytest
-
 from coop_core.services.credito_service import CreditoService
 
 
@@ -65,7 +64,10 @@ def test_credito_capital_cero_lanza_error(repos: dict[str, Any]) -> None:
     sid = _insert_socio(repos, "X", "Y")
     with pytest.raises(ValueError):
         _make_service(repos).create(
-            socio_ids=[sid], capital=0, interes_tasa=0.02, n_cuotas=12,
+            socio_ids=[sid],
+            capital=0,
+            interes_tasa=0.02,
+            n_cuotas=12,
             socios_data=[{"id": sid, "nombres": "X", "apellidos": "Y"}],
         )
 
@@ -74,7 +76,10 @@ def test_credito_cuotas_cero_lanza_error(repos: dict[str, Any]) -> None:
     sid = _insert_socio(repos, "X", "Y")
     with pytest.raises(ValueError):
         _make_service(repos).create(
-            socio_ids=[sid], capital=100_000, interes_tasa=0.02, n_cuotas=0,
+            socio_ids=[sid],
+            capital=100_000,
+            interes_tasa=0.02,
+            n_cuotas=0,
             socios_data=[{"id": sid, "nombres": "X", "apellidos": "Y"}],
         )
 
@@ -83,7 +88,10 @@ def test_tabla_amortizacion_montos_enteros(repos: dict[str, Any]) -> None:
     _set_caja(repos, 2_000_000)
     sid = _insert_socio(repos, "Carlos", "Mesa")
     result = _make_service(repos).create(
-        socio_ids=[sid], capital=750_000, interes_tasa=0.02, n_cuotas=6,
+        socio_ids=[sid],
+        capital=750_000,
+        interes_tasa=0.02,
+        n_cuotas=6,
         socios_data=[{"id": sid, "nombres": "Carlos", "apellidos": "Mesa"}],
         fecha_inicio=date(2024, 1, 1),
     )

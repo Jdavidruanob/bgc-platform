@@ -1,4 +1,5 @@
 import coop_core.config.papeleria as mod
+import pytest
 
 
 def test_all_cobrables_by_default() -> None:

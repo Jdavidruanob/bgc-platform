@@ -42,27 +42,24 @@ Canal de notificación a los socios. Sin diálogo, sin estado, sin IA:
 
 ## Interfaz `Notificador` y sus implementaciones
 
+La interfaz fue simplificada respecto al diseño inicial: en lugar de plantillas y parámetros,
+la API renderiza el texto antes de guardarlo en `notificaciones_whatsapp`, y el bot solo
+necesita enviar texto plano. No se usan plantillas en el código del bot.
+
 ```python
 # packages/contracts/src/coop_contracts/notificador.py
 
-from pathlib import Path
 from typing import Protocol
-from dataclasses import dataclass
+from pydantic import BaseModel
 
-@dataclass
-class ResultadoEnvio:
+class ResultadoEnvio(BaseModel):
     exitoso: bool
-    mensaje_id: str | None = None
+    canal: str        # "cloud_api" | "wa_me_link" | "mock"
+    wa_me_url: str | None = None
     error: str | None = None
 
 class Notificador(Protocol):
-    def enviar(
-        self,
-        socio_id: int,
-        plantilla: str,
-        parametros: dict,
-        adjunto: Path | None = None,
-    ) -> ResultadoEnvio: ...
+    def enviar(self, numero_e164: str, texto: str) -> ResultadoEnvio: ...
 ```
 
 **Tres implementaciones** (todas en `packages/bot/`, responsabilidad de Dev B):
@@ -70,8 +67,11 @@ class Notificador(Protocol):
 | Implementación | Cuándo se usa |
 |---------------|---------------|
 | `CloudApiNotificador` | Producción con Meta Cloud API configurada |
-| `WaMeLinkNotificador` | Fallback: genera enlaces `wa.me` que el tesorero abre y envía desde su teléfono. Sin adjuntos, solo texto. Funciona sin cuenta de Meta. |
-| `MockNotificador` | Desarrollo y tests. No envía nada, registra en log. |
+| `WaMeLinkNotificador` | Fallback: genera un enlace `wa.me?text=...` que el tesorero abre y envía desde su teléfono. `exitoso=True` significa que el link se generó; el mensaje no está enviado hasta que el tesorero lo abra. |
+| `MockNotificador` | Desarrollo y tests. No envía nada; registra en `enviados: list[dict]`. |
+
+**Composición en producción:** `NotificadorConFallback(CloudApiNotificador, WaMeLinkNotificador)`.
+Si no hay credenciales de Meta configuradas, se usa `WaMeLinkNotificador` directamente.
 
 **El fallback `WaMeLinkNotificador` no es opcional.** Es el plan de contingencia si Meta restringe la cuenta y también permite operar desde el día uno mientras se configura Cloud API.
 
@@ -93,20 +93,24 @@ Deben estar redactadas en tono transaccional para evitar clasificación como mar
 ALTER TABLE socios ADD COLUMN whatsapp_e164 TEXT;       -- ej: "+573001234567"
 ALTER TABLE socios ADD COLUMN optin_whatsapp_fecha DATE; -- fecha de consentimiento (exigido por Meta)
 
--- Nueva tabla de registro de envíos:
+-- Nueva tabla de registro de envíos (texto pre-renderizado, sin sistema de plantillas):
 CREATE TABLE notificaciones_whatsapp (
-    id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    created_at      TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-    socio_id        INTEGER REFERENCES socios(id),
-    plantilla       TEXT NOT NULL,
-    parametros      JSONB NOT NULL,
-    adjunto_path    TEXT,
-    estado          TEXT NOT NULL DEFAULT 'pendiente', -- pendiente | enviado | fallido | fallback_walink
-    mensaje_id_meta TEXT,   -- ID retornado por Meta Cloud API
-    error           TEXT,
-    intentos        INT NOT NULL DEFAULT 0
+    id               INTEGER PRIMARY KEY,
+    socio_id         INTEGER NOT NULL REFERENCES socios(id),
+    numero_e164      TEXT NOT NULL,              -- destino de WhatsApp
+    texto            TEXT NOT NULL,              -- mensaje ya renderizado
+    estado           TEXT NOT NULL DEFAULT 'pendiente', -- pendiente | enviada | fallida
+    intentos         INTEGER NOT NULL DEFAULT 0,
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ultimo_intento_at TIMESTAMP,
+    error            TEXT
 );
 ```
+
+> **Nota de implementación:** el diseño original usaba `plantilla` + `parametros` JSONB para
+> renderizado en el bot. Se simplificó: la API renderiza el texto antes de insertar en la tabla,
+> y el bot solo necesita `numero_e164` y `texto`. Esto elimina la dependencia del bot en el
+> sistema de plantillas de Meta y simplifica la interfaz `Notificador`.
 
 ## Flujo de notificación post-operación
 

@@ -67,4 +67,4 @@ class AuxiliarRepository:
         cursor.execute(sql, tuple(params))
         rows = cursor.fetchall()
         column_names = [d[0] for d in cursor.description]
-        return [dict(zip(column_names, row)) for row in rows]
+        return [dict(zip(column_names, row, strict=False)) for row in rows]

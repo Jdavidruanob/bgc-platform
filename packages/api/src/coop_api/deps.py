@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import os
-from typing import Annotated, Generator
-
-from fastapi import Depends, Header, HTTPException
+from collections.abc import Generator
+from typing import Annotated
 
 from coop_core.db.connection import DbConnection
+from fastapi import Depends, Header, HTTPException
 
 
 def get_db() -> Generator[DbConnection, None, None]:
@@ -18,7 +18,7 @@ def get_db() -> Generator[DbConnection, None, None]:
     if not db_url:
         raise RuntimeError("Variable de entorno DATABASE_URL no configurada.")
     with psycopg.connect(db_url) as conn:
-        yield conn  # type: ignore[misc]  # psycopg3 satisface DbConnection Protocol
+        yield conn  # psycopg3 connection satisface DbConnection Protocol en runtime
 
 
 def require_auth(authorization: Annotated[str | None, Header()] = None) -> None:

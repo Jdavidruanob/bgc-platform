@@ -6,8 +6,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field
 
-
 # ── Request bodies ────────────────────────────────────────────────────────────
+
 
 class AporteReqItem(BaseModel):
     socio_id: int
@@ -43,6 +43,7 @@ class CombinadosRequest(BaseModel):
 
 
 # ── Respuestas de consulta ────────────────────────────────────────────────────
+
 
 class HealthOk(BaseModel):
     status: str = "ok"
@@ -106,6 +107,7 @@ class CajaEstado(BaseModel):
 
 
 # ── Respuestas de operación ───────────────────────────────────────────────────
+
 
 class SocioRef(BaseModel):
     id: int
@@ -173,6 +175,7 @@ class CombinadoResponse(BaseModel):
 
 # ── Notificaciones ────────────────────────────────────────────────────────────
 
+
 class NotificacionPendiente(BaseModel):
     id: int
     socio_id: int
@@ -191,6 +194,7 @@ class PatchNotificacionRequest(BaseModel):
 
 
 # ── Errores ───────────────────────────────────────────────────────────────────
+
 
 class ErrorDetail(BaseModel):
     codigo: str

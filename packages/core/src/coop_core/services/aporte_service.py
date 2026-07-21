@@ -61,23 +61,27 @@ class AporteService:
                 saldo_caja += monto
                 nombre = f"{socio_data['nombres']} {socio_data['apellidos']}"
                 self._auxiliar.add(
-                    fecha=fecha, tipo="Aporte", socio=nombre,
-                    recibo=recibo_id, monto=monto, saldo=saldo_caja,
+                    fecha=fecha,
+                    tipo="Aporte",
+                    socio=nombre,
+                    recibo=recibo_id,
+                    monto=monto,
+                    saldo=saldo_caja,
                 )
-                aportes_result.append({
-                    "socio_id": socio_id,
-                    "nombres": str(socio_data["nombres"]),
-                    "apellidos": str(socio_data["apellidos"]),
-                    "monto": monto,
-                    "saldo_anterior": saldo_anterior,
-                    "saldo_nuevo": saldo_anterior + monto,
-                    "cobro_papeleria": es_cobrable(socio_id),
-                })
+                aportes_result.append(
+                    {
+                        "socio_id": socio_id,
+                        "nombres": str(socio_data["nombres"]),
+                        "apellidos": str(socio_data["apellidos"]),
+                        "monto": monto,
+                        "saldo_anterior": saldo_anterior,
+                        "saldo_nuevo": saldo_anterior + monto,
+                        "cobro_papeleria": es_cobrable(socio_id),
+                    }
+                )
 
             self._config.set("saldo_en_caja", str(saldo_caja))
-            self._config.set(
-                "total_admin", str(saldo_admin + PAPELERIA_POR_APORTE * count_cobrables)
-            )
+            self._config.set("total_admin", str(saldo_admin + PAPELERIA_POR_APORTE * count_cobrables))
             self._conn.commit()
 
             return {

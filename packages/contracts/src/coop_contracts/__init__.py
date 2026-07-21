@@ -6,12 +6,12 @@ from coop_contracts.intenciones import (
     IntConsultarSocio,
     IntCrearCredito,
     IntDesconocida,
+    Intencion,
     IntIncompleta,
     IntRegAporte,
     IntRegCombinado,
     IntRegPago,
     IntRegRetiro,
-    Intencion,
     PagoItem,
 )
 from coop_contracts.notificador import MockNotificador, Notificador, ResultadoEnvio
@@ -26,8 +26,8 @@ from coop_contracts.respuestas import (
     ErrorResponse,
     PagosRequest,
     PagosResponse,
-    RetirosRequest,
     RetiroResponse,
+    RetirosRequest,
     SocioDetalle,
     SociosSearchResponse,
 )

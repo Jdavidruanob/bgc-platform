@@ -11,14 +11,14 @@ import os
 from datetime import date
 from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 
 from coop_contracts.mock_data import get_initial_state, make_nombre_completo
 from coop_contracts.respuestas import (
+    AporteResultItem,
     AportesRequest,
     AportesResponse,
-    AporteResultItem,
     CajaEstado,
     CombinadoResponse,
     CombinadosRequest,
@@ -31,12 +31,12 @@ from coop_contracts.respuestas import (
     HealthOk,
     NotificacionesPendientesResponse,
     NotificacionPendiente,
+    PagoResultItem,
     PagosRequest,
     PagosResponse,
-    PagoResultItem,
     PatchNotificacionRequest,
-    RetirosRequest,
     RetiroResponse,
+    RetirosRequest,
     SocioDetalle,
     SocioRef,
     SocioSearchItem,
@@ -53,6 +53,7 @@ _PAPELERIA = 3000
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _error(codigo: str, mensaje: str, status_code: int, detalle: Any = None) -> JSONResponse:
     body = ErrorResponse(error=ErrorDetail(codigo=codigo, mensaje=mensaje, detalle=detalle))
@@ -111,6 +112,7 @@ def _today() -> str:
 
 # ── Auth dependency ───────────────────────────────────────────────────────────
 
+
 def _require_auth(authorization: Annotated[str | None, Header()] = None) -> None:
     if authorization != f"Bearer {_MOCK_TOKEN}":
         raise HTTPException(status_code=401, detail="Token ausente o inválido")
@@ -130,12 +132,14 @@ IdempDep = Annotated[str, Depends(_require_idempotency)]
 
 # ── Health ────────────────────────────────────────────────────────────────────
 
+
 @app.get("/health")
 def health() -> HealthOk:
     return HealthOk(version="0.1.0")
 
 
 # ── Socios ────────────────────────────────────────────────────────────────────
+
 
 @app.get("/socios")
 def buscar_socios(q: str = "", limit: int = 10, _auth: AuthDep = None) -> SociosSearchResponse:
@@ -193,9 +197,7 @@ def get_creditos_socio(socio_id: int, _auth: AuthDep = None) -> CreditosResponse
 @app.get("/creditos/{letra_id}/cuotas-pendientes")
 def get_cuotas_pendientes(letra_id: int, _auth: AuthDep = None) -> CuotasPendientesResponse:
     c = _find_credito(letra_id)
-    deuda_total = sum(
-        q["cuota_mensual"] + q["mora_estimada"] for q in c["cuotas_pendientes"]
-    )
+    deuda_total = sum(q["cuota_mensual"] + q["mora_estimada"] for q in c["cuotas_pendientes"])
     cuotas = [CuotaPendiente(**q) for q in c["cuotas_pendientes"]]
     return CuotasPendientesResponse(
         letra_id=letra_id,
@@ -206,12 +208,14 @@ def get_cuotas_pendientes(letra_id: int, _auth: AuthDep = None) -> CuotasPendien
 
 # ── Caja ──────────────────────────────────────────────────────────────────────
 
+
 @app.get("/caja")
 def get_caja(_auth: AuthDep = None) -> CajaEstado:
     return CajaEstado(**_state["caja"])
 
 
 # ── Operaciones ───────────────────────────────────────────────────────────────
+
 
 def _check_idempotency(key: str, payload_hash: int) -> dict | None:
     if key in _state["idempotency_keys"]:
@@ -365,7 +369,7 @@ def registrar_pagos(
 
         saldo_antes = credito["saldo_capital"]
         credito["saldo_capital"] -= capital_pagado
-        credito["cuotas_pendientes"] = cuotas_pend[len(cuotas_a_pagar):]
+        credito["cuotas_pendientes"] = cuotas_pend[len(cuotas_a_pagar) :]
         total_ingreso += total_cuotas + mora
 
         pagos_result.append(
@@ -408,8 +412,8 @@ def registrar_combinado(
         return CombinadoResponse(**cached)
 
     # Reutilizar lógica de aportes
-    aportes_body = AportesRequest(recibi_de_id=body.recibi_de_id, aportes=body.aportes)
-    aportes_req = AportesRequest(recibi_de_id=body.recibi_de_id, aportes=body.aportes)
+    AportesRequest(recibi_de_id=body.recibi_de_id, aportes=body.aportes)
+    AportesRequest(recibi_de_id=body.recibi_de_id, aportes=body.aportes)
     # Llamar internamente sin idempotencia (ya la manejamos arriba)
     recibi_de = _find_socio(body.recibi_de_id)
     recibo_id = _next_recibo()
@@ -450,7 +454,7 @@ def registrar_combinado(
         nros = [q["nro_cuota"] for q in cuotas_a_pagar]
         saldo_antes = credito["saldo_capital"]
         credito["saldo_capital"] -= capital_pagado
-        credito["cuotas_pendientes"] = cuotas_pend[len(cuotas_a_pagar):]
+        credito["cuotas_pendientes"] = cuotas_pend[len(cuotas_a_pagar) :]
         total_pagos += total_c + mora
         pagos_result.append(
             PagoResultItem(
@@ -484,13 +488,10 @@ def registrar_combinado(
 
 # ── Notificaciones ────────────────────────────────────────────────────────────
 
+
 @app.get("/notificaciones/pendientes")
 def get_notificaciones_pendientes(_auth: AuthDep = None) -> NotificacionesPendientesResponse:
-    pendientes = [
-        NotificacionPendiente(**n)
-        for n in _state["notificaciones"]
-        if n["estado"] == "pendiente"
-    ]
+    pendientes = [NotificacionPendiente(**n) for n in _state["notificaciones"] if n["estado"] == "pendiente"]
     return NotificacionesPendientesResponse(notificaciones=pendientes)
 
 
@@ -510,6 +511,7 @@ def patch_notificacion(
 
 
 # ── Test utilities (solo para entorno de testing) ─────────────────────────────
+
 
 @app.post("/test/reset", status_code=200, include_in_schema=False)
 def reset_state() -> dict:

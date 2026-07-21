@@ -41,7 +41,7 @@ class LiquidacionesRepository:
             (letra_id,),
         )
         cols = [d[0] for d in cursor.description]
-        return [dict(zip(cols, row)) for row in cursor.fetchall()]
+        return [dict(zip(cols, row, strict=False)) for row in cursor.fetchall()]
 
     def get_current_debt(self, letra_id: int) -> int:
         cursor = self._conn.cursor()
@@ -77,12 +77,14 @@ class LiquidacionesRepository:
             return
 
         capital_original, tasa_interes, no_cuotas_originales, fecha_inicio_str = (
-            int(credito[0]), float(credito[1]), int(credito[2]), str(credito[3])
+            int(credito[0]),
+            float(credito[1]),
+            int(credito[2]),
+            str(credito[3]),
         )
 
         cursor.execute(
-            "SELECT SUM(valor_cuota) FROM liquidaciones "
-            "WHERE credito_letra = %s AND fecha_pago IS NOT NULL",
+            "SELECT SUM(valor_cuota) FROM liquidaciones WHERE credito_letra = %s AND fecha_pago IS NOT NULL",
             (letra_id,),
         )
         pagado_cuotas = int(cursor.fetchone()[0] or 0)
@@ -157,10 +159,17 @@ class LiquidacionesRepository:
             int_mes = int((saldo_iter + capital_en_vencidas) * tasa_interes)
             cuota_total = cap_pago + int_mes
             saldo_final_row = (saldo_iter - cap_pago) + capital_en_vencidas
-            nuevas_cuotas.append((
-                letra_id, nro_start, fecha_start.strftime("%Y-%m-%d"),
-                int(cap_pago), int(int_mes), int(cuota_total), int(saldo_final_row),
-            ))
+            nuevas_cuotas.append(
+                (
+                    letra_id,
+                    nro_start,
+                    fecha_start.strftime("%Y-%m-%d"),
+                    int(cap_pago),
+                    int(int_mes),
+                    int(cuota_total),
+                    int(saldo_final_row),
+                )
+            )
             saldo_iter -= cap_pago
             nro_start += 1
 

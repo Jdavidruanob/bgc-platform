@@ -1,4 +1,5 @@
 """Helpers compartidos por PagoService y CombinadoService."""
+
 from datetime import date, datetime
 from typing import Any
 
@@ -31,23 +32,23 @@ def prepare_cuotas(
     cols = [d[0] for d in cursor.description]
     nombre = f"{socio_data['nombres']} {socio_data['apellidos']}"
     if len(filas) < n_cuotas:
-        raise ValueError(
-            f"No hay suficientes cuotas pendientes en la letra {letra_id} para {nombre}."
-        )
+        raise ValueError(f"No hay suficientes cuotas pendientes en la letra {letra_id} para {nombre}.")
     items: list[dict[str, Any]] = []
     mensajes: list[str] = []
     for raw in filas:
-        fila = dict(zip(cols, raw))
+        fila = dict(zip(cols, raw, strict=False))
         mora = calculate_mora(str(fila["fecha_vencimiento"]), hoy, int(fila["valor_cuota"]), tasa_mora)
         costo_base = int(fila["valor_cuota"]) + int(fila["interes_mes"])
-        items.append({
-            "nro": int(fila["nro_cuota"]),
-            "monto_total": costo_base + mora,
-            "monto_base": costo_base,
-            "mora": mora,
-            "cap": int(fila["valor_cuota"]),
-            "int": int(fila["interes_mes"]),
-        })
+        items.append(
+            {
+                "nro": int(fila["nro_cuota"]),
+                "monto_total": costo_base + mora,
+                "monto_base": costo_base,
+                "mora": mora,
+                "cap": int(fila["valor_cuota"]),
+                "int": int(fila["interes_mes"]),
+            }
+        )
         mensajes.append(f"Cuota #{fila['nro_cuota']}")
     return {
         "tipo": "CUOTAS_MANUAL",
@@ -86,8 +87,7 @@ def prepare_abono(
         else:
             if pagables == 0:
                 raise ValueError(
-                    f"Abono insuficiente para {nombre} (Letra {letra_id}): "
-                    "no cubre la primera cuota vencida."
+                    f"Abono insuficiente para {nombre} (Letra {letra_id}): no cubre la primera cuota vencida."
                 )
             raise ValueError(
                 f"Abono incompleto en letra {letra_id} para {nombre}. "
@@ -162,9 +162,14 @@ def execute_pago_op(
             dict_recibo["interes_consolidado"] += it["int"]
             dict_recibo["mora_consolidada"] += it["mora"]
             auxiliar.add(
-                fecha=fecha, tipo="Pago Credito", socio=nombre,
-                monto=it["monto_base"], saldo=saldo_caja,
-                recibo=recibo_id, cuota=it["nro"], id_credito=str(letra_id),
+                fecha=fecha,
+                tipo="Pago Credito",
+                socio=nombre,
+                monto=it["monto_base"],
+                saldo=saldo_caja,
+                recibo=recibo_id,
+                cuota=it["nro"],
+                id_credito=str(letra_id),
             )
 
     elif op["tipo"] == "ABONO_CASCADA":
@@ -194,9 +199,14 @@ def execute_pago_op(
             dict_recibo["interes_consolidado"] += int(v["data"]["interes_mes"])
             dict_recibo["mora_consolidada"] += v["mora"]
             auxiliar.add(
-                fecha=fecha, tipo="Pago Credito", socio=nombre,
-                monto=v["monto_base"], saldo=saldo_caja,
-                recibo=recibo_id, cuota=nro, id_credito=str(letra_id),
+                fecha=fecha,
+                tipo="Pago Credito",
+                socio=nombre,
+                monto=v["monto_base"],
+                saldo=saldo_caja,
+                recibo=recibo_id,
+                cuota=nro,
+                id_credito=str(letra_id),
             )
         if capital_puro > 0:
             cursor.execute(
@@ -211,9 +221,14 @@ def execute_pago_op(
             liquidaciones.recalculate_amortization(letra_id, capital_puro)
             dict_recibo["valor_capital_consolidado"] += capital_puro
             auxiliar.add(
-                fecha=fecha, tipo="Abono Capital", socio=nombre,
-                monto=capital_puro, saldo=saldo_caja,
-                recibo=recibo_id, cuota=0, id_credito=str(letra_id),
+                fecha=fecha,
+                tipo="Abono Capital",
+                socio=nombre,
+                monto=capital_puro,
+                saldo=saldo_caja,
+                recibo=recibo_id,
+                cuota=0,
+                id_credito=str(letra_id),
             )
         if vencidas:
             dict_recibo["nro_cuotas_pagadas_start"] = int(vencidas[0]["data"]["nro_cuota"])

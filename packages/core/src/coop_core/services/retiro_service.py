@@ -55,8 +55,12 @@ class RetiroService:
 
             nombre = f"{socio_data['nombres']} {socio_data['apellidos']}"
             self._auxiliar.add(
-                fecha=fecha, tipo="Retiro", socio=nombre,
-                recibo=recibo_id, monto=-monto, saldo=nuevo_saldo_caja,
+                fecha=fecha,
+                tipo="Retiro",
+                socio=nombre,
+                recibo=recibo_id,
+                monto=-monto,
+                saldo=nuevo_saldo_caja,
             )
 
             self._conn.commit()
