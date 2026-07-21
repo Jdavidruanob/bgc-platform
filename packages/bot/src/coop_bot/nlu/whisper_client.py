@@ -20,4 +20,4 @@ class WhisperClient:
             file=archivo,
             language="es",
         )
-        return transcripcion.text
+        return str(transcripcion.text)

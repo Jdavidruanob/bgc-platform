@@ -6,7 +6,7 @@ from collections.abc import Callable, Coroutine
 from typing import Any, TypeVar
 
 import httpx
-from coop_contracts.respuestas import (  # type: ignore[import-untyped]
+from coop_contracts.respuestas import (
     AportesRequest,
     AportesResponse,
     CajaEstado,
@@ -95,9 +95,7 @@ class ApiClient:
         return await self._get(f"/socios/{socio_id}/creditos", {}, CreditosResponse)
 
     async def get_cuotas_pendientes(self, letra_id: int) -> CuotasPendientesResponse:
-        return await self._get(
-            f"/creditos/{letra_id}/cuotas-pendientes", {}, CuotasPendientesResponse
-        )
+        return await self._get(f"/creditos/{letra_id}/cuotas-pendientes", {}, CuotasPendientesResponse)
 
     async def get_caja(self) -> CajaEstado:
         return await self._get("/caja", {}, CajaEstado)
@@ -107,9 +105,7 @@ class ApiClient:
     async def get_notificaciones_pendientes(self) -> NotificacionesPendientesResponse:
         return await self._get("/notificaciones/pendientes", {}, NotificacionesPendientesResponse)
 
-    async def patch_notificacion(
-        self, notificacion_id: int, estado: str, error: str | None = None
-    ) -> None:
+    async def patch_notificacion(self, notificacion_id: int, estado: str, error: str | None = None) -> None:
         body = PatchNotificacionRequest(estado=estado, error=error)
         response = await self._pedir(
             lambda: self._client.patch(
@@ -121,9 +117,7 @@ class ApiClient:
 
     # ── Operaciones ──────────────────────────────────────────────────────────
 
-    async def registrar_aportes(
-        self, body: AportesRequest, idempotency_key: str
-    ) -> AportesResponse:
+    async def registrar_aportes(self, body: AportesRequest, idempotency_key: str) -> AportesResponse:
         return await self._post("/operaciones/aportes", body, idempotency_key, AportesResponse)
 
     async def registrar_retiro(self, body: RetirosRequest, idempotency_key: str) -> RetiroResponse:
@@ -132,9 +126,7 @@ class ApiClient:
     async def registrar_pagos(self, body: PagosRequest, idempotency_key: str) -> PagosResponse:
         return await self._post("/operaciones/pagos", body, idempotency_key, PagosResponse)
 
-    async def registrar_combinado(
-        self, body: CombinadosRequest, idempotency_key: str
-    ) -> CombinadoResponse:
+    async def registrar_combinado(self, body: CombinadosRequest, idempotency_key: str) -> CombinadoResponse:
         return await self._post("/operaciones/combinados", body, idempotency_key, CombinadoResponse)
 
     # ── Test utilities ───────────────────────────────────────────────────────

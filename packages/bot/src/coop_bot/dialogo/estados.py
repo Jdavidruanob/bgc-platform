@@ -12,10 +12,10 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Literal, cast
+from typing import Literal
 from uuid import uuid4
 
-from coop_contracts.intenciones import (  # type: ignore[import-untyped]
+from coop_contracts.intenciones import (
     IntAmbigua,
     IntConsultarCaja,
     IntConsultarCuotas,
@@ -30,7 +30,7 @@ from coop_contracts.intenciones import (  # type: ignore[import-untyped]
     IntRegRetiro,
     PagoItem,
 )
-from coop_contracts.respuestas import (  # type: ignore[import-untyped]
+from coop_contracts.respuestas import (
     AporteReqItem,
     AportesRequest,
     CombinadosRequest,
@@ -116,14 +116,11 @@ class MaquinaEstados:
 
     async def procesar_intencion(self, intencion: Intencion) -> RespuestaDialogo:
         if isinstance(intencion, IntDesconocida):
-            return self._quedarse_en_espera(
-                "No entendí tu mensaje. ¿Puedes repetirlo de otra forma?"
-            )
+            return self._quedarse_en_espera("No entendí tu mensaje. ¿Puedes repetirlo de otra forma?")
         if isinstance(intencion, IntIncompleta):
             faltantes = ", ".join(intencion.campos_faltantes)
             return self._quedarse_en_espera(
-                f"Me falta información para procesar tu solicitud: {faltantes}. "
-                "¿Puedes completarla?"
+                f"Me falta información para procesar tu solicitud: {faltantes}. ¿Puedes completarla?"
             )
         if isinstance(intencion, IntAmbigua):
             opciones = ", ".join(intencion.posibles_intenciones)
@@ -207,14 +204,11 @@ class MaquinaEstados:
             resolucion = await resolver_socio(self.cliente, nombre)
             if resolucion.estado == "no_encontrado":
                 return self._cancelar(
-                    f"No encontré ningún socio llamado '{nombre}'. Verifica el nombre "
-                    "e intenta de nuevo."
+                    f"No encontré ningún socio llamado '{nombre}'. Verifica el nombre e intenta de nuevo."
                 )
             if resolucion.estado == "ambiguo":
                 self.sesion.pendientes.append(
-                    SeleccionPendiente(
-                        tipo="socio", etiqueta=nombre, candidatos_socio=resolucion.candidatos
-                    )
+                    SeleccionPendiente(tipo="socio", etiqueta=nombre, candidatos_socio=resolucion.candidatos)
                 )
                 self.sesion.estado = EstadoDialogo.ESPERANDO_DESAMBIGUACION
                 return RespuestaDialogo(
@@ -259,16 +253,11 @@ class MaquinaEstados:
             return await self._ejecutar_consulta()
         return self._construir_confirmacion()
 
-    async def _recibir_seleccion_socio(
-        self, pendiente: SeleccionPendiente, texto: str
-    ) -> RespuestaDialogo:
+    async def _recibir_seleccion_socio(self, pendiente: SeleccionPendiente, texto: str) -> RespuestaDialogo:
         indice = parsear_seleccion(texto, len(pendiente.candidatos_socio))
         if indice is None:
             return RespuestaDialogo(
-                texto=(
-                    "No entendí tu selección.\n"
-                    f"{formatear_lista_socios(pendiente.candidatos_socio)}"
-                ),
+                texto=(f"No entendí tu selección.\n{formatear_lista_socios(pendiente.candidatos_socio)}"),
                 requiere_timeout=True,
             )
         self.sesion.pendientes.popleft()
@@ -279,16 +268,11 @@ class MaquinaEstados:
         )
         return await self._resolver_entidades_y_continuar()
 
-    async def _recibir_seleccion_letra(
-        self, pendiente: SeleccionPendiente, texto: str
-    ) -> RespuestaDialogo:
+    async def _recibir_seleccion_letra(self, pendiente: SeleccionPendiente, texto: str) -> RespuestaDialogo:
         indice = parsear_seleccion(texto, len(pendiente.candidatos_letra))
         if indice is None:
             return RespuestaDialogo(
-                texto=(
-                    "No entendí tu selección.\n"
-                    f"{formatear_lista_letras(pendiente.candidatos_letra)}"
-                ),
+                texto=(f"No entendí tu selección.\n{formatear_lista_letras(pendiente.candidatos_letra)}"),
                 requiere_timeout=True,
             )
         self.sesion.pendientes.popleft()
@@ -317,6 +301,7 @@ class MaquinaEstados:
             elif isinstance(intencion, IntConsultarSocio):
                 texto, pdf_bytes, nombre_pdf = await self._consultar_socio(intencion), None, None
             else:
+                assert isinstance(intencion, IntConsultarCuotas)
                 texto, pdf_bytes, nombre_pdf = await self._consultar_cuotas(intencion)
         except ApiError as exc:
             self._reset_operacion()
@@ -349,9 +334,7 @@ class MaquinaEstados:
             f"Créditos activos: {detalle.creditos_activos}"
         )
 
-    async def _consultar_cuotas(
-        self, intencion: IntConsultarCuotas
-    ) -> tuple[str, bytes | None, str | None]:
+    async def _consultar_cuotas(self, intencion: IntConsultarCuotas) -> tuple[str, bytes | None, str | None]:
         nombre_socio = self.sesion.socios[intencion.socio].nombre_completo
         letra_id = self.sesion.letras[intencion.socio]
         resp = await self.cliente.get_cuotas_pendientes(letra_id)
@@ -368,9 +351,7 @@ class MaquinaEstados:
             f"Deuda total actual: {formatear_monto(resp.deuda_total_actual)}\n"
             f"Cuotas pendientes: {len(resp.cuotas_pendientes)}"
         )
-        pdf_bytes = generar_pdf_tabla_cuotas(
-            letra_id, resp.cuotas_pendientes, resp.deuda_total_actual
-        )
+        pdf_bytes = generar_pdf_tabla_cuotas(letra_id, resp.cuotas_pendientes, resp.deuda_total_actual)
         return texto, pdf_bytes, nombre_archivo_cuotas(letra_id)
 
     async def _ejecutar_operacion(self) -> tuple[bytes, str]:
@@ -403,6 +384,7 @@ class MaquinaEstados:
             resp_pago = await self.cliente.registrar_pagos(body_pago, key)
             datos = recibo_desde_pagos(resp_pago)
         else:
+            assert isinstance(intencion, IntRegCombinado)
             body_combinado = CombinadosRequest(
                 recibi_de_id=self.sesion.socios[intencion.recibi_de].id,
                 aportes=[
@@ -472,7 +454,7 @@ def _nombres_socios(intencion: Intencion) -> list[str]:
 
 def _pagos_de(intencion: Intencion) -> list[PagoItem]:
     if isinstance(intencion, IntRegPago | IntRegCombinado):
-        return cast(list[PagoItem], intencion.pagos)
+        return intencion.pagos
     return []
 
 

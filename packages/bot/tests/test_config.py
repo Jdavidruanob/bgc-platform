@@ -40,9 +40,7 @@ def test_desde_entorno_log_level_default(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 @pytest.mark.parametrize("faltante", sorted(ENV_COMPLETO))
-def test_desde_entorno_falla_si_falta_variable(
-    monkeypatch: pytest.MonkeyPatch, faltante: str
-) -> None:
+def test_desde_entorno_falla_si_falta_variable(monkeypatch: pytest.MonkeyPatch, faltante: str) -> None:
     _set_env(monkeypatch)
     monkeypatch.delenv(faltante, raising=False)
 

@@ -71,9 +71,7 @@ def test_obtener_sesion_crea_una_nueva_si_no_existe() -> None:
 
 
 def test_obtener_sesion_reutiliza_la_existente() -> None:
-    sesion_existente = SesionDialogo(
-        chat_id=OPERADOR_CHAT_ID, estado=EstadoDialogo.ESPERANDO_CONFIRMACION
-    )
+    sesion_existente = SesionDialogo(chat_id=OPERADOR_CHAT_ID, estado=EstadoDialogo.ESPERANDO_CONFIRMACION)
     context = _contexto(chat_data={"sesion": sesion_existente})
     sesion = bot_telegram._obtener_sesion(context, OPERADOR_CHAT_ID)
     assert sesion is sesion_existente
@@ -111,9 +109,7 @@ async def test_on_text_consulta_caja_responde_con_el_saldo() -> None:
 async def test_on_text_crear_credito_muestra_stub() -> None:
     context = _contexto()
     context.bot_data["llm_client"].interpretar = AsyncMock(
-        return_value=IntCrearCredito(
-            intencion="crear_credito", socios=["Pedro Gómez"], capital=1, n_cuotas=1
-        )
+        return_value=IntCrearCredito(intencion="crear_credito", socios=["Pedro Gómez"], capital=1, n_cuotas=1)
     )
     update = _update(OPERADOR_CHAT_ID, texto="crea un crédito para Pedro")
 

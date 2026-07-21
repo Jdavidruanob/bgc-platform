@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from coop_contracts.intenciones import (  # type: ignore[import-untyped]
+from coop_contracts.intenciones import (
     Intencion,
     IntRegAporte,
     IntRegCombinado,
@@ -43,8 +43,7 @@ def _resumen_aporte(intencion: IntRegAporte, socios: dict[str, SocioResuelto]) -
     for item in intencion.aportes:
         s = socios[item.nombre]
         lineas.append(
-            f"- {s.nombre_completo}: {formatear_monto(item.monto)} "
-            f"(saldo actual: {formatear_monto(s.saldo)})"
+            f"- {s.nombre_completo}: {formatear_monto(item.monto)} (saldo actual: {formatear_monto(s.saldo)})"
         )
     lineas.append("")
     lineas.append(PROMPT_CONFIRMACION)
@@ -59,9 +58,7 @@ def _resumen_retiro(intencion: IntRegRetiro, socios: dict[str, SocioResuelto]) -
     )
 
 
-def _resumen_pago(
-    intencion: IntRegPago, socios: dict[str, SocioResuelto], letras: dict[str, int]
-) -> str:
+def _resumen_pago(intencion: IntRegPago, socios: dict[str, SocioResuelto], letras: dict[str, int]) -> str:
     recibi_de = socios[intencion.recibi_de]
     lineas = [f"Recibí de: {recibi_de.nombre_completo}", "Pagos:"]
     for item in intencion.pagos:
@@ -86,8 +83,8 @@ def _resumen_combinado(
             )
     if intencion.pagos:
         lineas.append("Pagos:")
-        for item in intencion.pagos:
-            lineas.append(_linea_pago(item, socios, letras))
+        for pago_item in intencion.pagos:
+            lineas.append(_linea_pago(pago_item, socios, letras))
     lineas.append("")
     lineas.append(PROMPT_CONFIRMACION)
     return "\n".join(lineas)
