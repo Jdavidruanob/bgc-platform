@@ -63,7 +63,7 @@ class CreditosRepository:
         if row is None:
             return None
         cols = [d[0] for d in cursor.description]
-        return dict(zip(cols, row))
+        return dict(zip(cols, row, strict=False))
 
     def find_active_by_socio_id(self, socio_id: int) -> list[dict[str, Any]]:
         cursor = self._conn.cursor()
@@ -77,7 +77,7 @@ class CreditosRepository:
             (socio_id,),
         )
         cols = [d[0] for d in cursor.description]
-        return [dict(zip(cols, row)) for row in cursor.fetchall()]
+        return [dict(zip(cols, row, strict=False)) for row in cursor.fetchall()]
 
     def get_socio_ids(self, letra_id: int) -> list[int]:
         cursor = self._conn.cursor()

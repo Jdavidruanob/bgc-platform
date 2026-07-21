@@ -1,11 +1,10 @@
-from fastapi import APIRouter
-from fastapi.responses import JSONResponse
-
 from coop_contracts.respuestas import CuotaPendiente, CuotasPendientesResponse
 from coop_core.repositories.creditos_repo import CreditosRepository
 from coop_core.repositories.liquidaciones_repo import LiquidacionesRepository
 from coop_core.services.amortization import calculate_mora
 from coop_core.utils.fecha import get_hoy
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 
 from coop_api.deps import AuthDep, DbDep
 from coop_api.errors import not_found

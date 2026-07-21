@@ -4,23 +4,20 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Header, HTTPException
-from fastapi.responses import JSONResponse
-
 from coop_contracts.respuestas import (
+    AporteResultItem,
     AportesRequest,
     AportesResponse,
-    AporteResultItem,
     CombinadoResponse,
     CombinadosRequest,
+    PagoResultItem,
     PagosRequest,
     PagosResponse,
-    PagoResultItem,
-    RetirosRequest,
     RetiroResponse,
+    RetirosRequest,
     SocioRef,
 )
-from coop_core.config.papeleria import PAPELERIA_POR_APORTE, count_cobrables, es_cobrable
+from coop_core.config.papeleria import PAPELERIA_POR_APORTE, count_cobrables
 from coop_core.repositories.auxiliar_repo import AuxiliarRepository
 from coop_core.repositories.config_repo import ConfigRepository
 from coop_core.repositories.creditos_repo import CreditosRepository
@@ -30,10 +27,12 @@ from coop_core.services.aporte_service import AporteService
 from coop_core.services.combinado_service import CombinadoService
 from coop_core.services.pago_service import PagoService
 from coop_core.services.retiro_service import RetiroService
+from fastapi import APIRouter, Header, HTTPException
+from fastapi.responses import JSONResponse
 
-from coop_api.deps import AuthDep, DbDep
-from coop_api.errors import not_found, value_error_to_response
 import coop_api.idempotency as idem
+from coop_api.deps import AuthDep, DbDep
+from coop_api.errors import value_error_to_response
 
 router = APIRouter(prefix="/operaciones", tags=["operaciones"])
 
@@ -46,18 +45,24 @@ def _require_idem(idempotency_key: IdempDep = None) -> str:  # type: ignore[assi
     return idempotency_key
 
 
-def _get_socio_or_404(socios_repo: SociosRepository, socio_id: int) -> dict:
+def _get_socio_or_404(socios_repo: SociosRepository, socio_id: int) -> dict[str, object]:
     s = socios_repo.find_by_id(socio_id)
     if s is None:
         raise HTTPException(
             status_code=404,
-            detail={"error": {"codigo": "SOCIO_NO_ENCONTRADO", "mensaje": f"No existe un socio con ID {socio_id}.", "detalle": None}},
+            detail={
+                "error": {
+                    "codigo": "SOCIO_NO_ENCONTRADO",
+                    "mensaje": f"No existe un socio con ID {socio_id}.",
+                    "detalle": None,
+                }
+            },
         )
     return s
 
 
-def _socio_ref(s: dict) -> SocioRef:
-    return SocioRef(id=int(s["id"]), nombre_completo=f"{s['nombres']} {s['apellidos']}")
+def _socio_ref(s: dict[str, object]) -> SocioRef:
+    return SocioRef(id=int(str(s["id"])), nombre_completo=f"{s['nombres']} {s['apellidos']}")
 
 
 @router.post("/aportes", status_code=201, response_model=None)
@@ -74,7 +79,7 @@ def registrar_aportes(
     except ValueError:
         return value_error_to_response(ValueError("IDEMPOTENCY_CONFLICT"))
     if cached:
-        return AportesResponse(**cached)
+        return AportesResponse.model_validate(cached)
 
     socios_repo = SociosRepository(db)
     recibi_de = _get_socio_or_404(socios_repo, body.recibi_de_id)
@@ -131,7 +136,7 @@ def registrar_retiro(
     except ValueError:
         return value_error_to_response(ValueError("IDEMPOTENCY_CONFLICT"))
     if cached:
-        return RetiroResponse(**cached)
+        return RetiroResponse.model_validate(cached)
 
     socios_repo = SociosRepository(db)
     socio = _get_socio_or_404(socios_repo, body.socio_id)
@@ -170,7 +175,7 @@ def registrar_pagos(
     except ValueError:
         return value_error_to_response(ValueError("IDEMPOTENCY_CONFLICT"))
     if cached:
-        return PagosResponse(**cached)
+        return PagosResponse.model_validate(cached)
 
     socios_repo = SociosRepository(db)
     creditos_repo = CreditosRepository(db)
@@ -182,18 +187,24 @@ def registrar_pagos(
         if creditos_repo.find_by_letra(item.letra_id) is None:
             raise HTTPException(
                 status_code=404,
-                detail={"error": {"codigo": "LETRA_NO_ENCONTRADA", "mensaje": f"No existe un crédito con letra {item.letra_id}.", "detalle": None}},
+                detail={
+                    "error": {
+                        "codigo": "LETRA_NO_ENCONTRADA",
+                        "mensaje": f"No existe un crédito con letra {item.letra_id}.",
+                        "detalle": None,
+                    }
+                },
             )
-        pagos_input.append({
-            "socio_data": s,
-            "letra_id": item.letra_id,
-            "n_cuotas": item.n_cuotas,
-            "abono_capital": item.abono_capital,
-        })
+        pagos_input.append(
+            {
+                "socio_data": s,
+                "letra_id": item.letra_id,
+                "n_cuotas": item.n_cuotas,
+                "abono_capital": item.abono_capital,
+            }
+        )
 
-    svc = PagoService(
-        db, LiquidacionesRepository(db), AuxiliarRepository(db), ConfigRepository(db)
-    )
+    svc = PagoService(db, LiquidacionesRepository(db), AuxiliarRepository(db), ConfigRepository(db))
     try:
         resultado = svc.register(body.recibi_de_id, pagos_input)
     except ValueError as exc:
@@ -240,7 +251,7 @@ def registrar_combinado(
     except ValueError:
         return value_error_to_response(ValueError("IDEMPOTENCY_CONFLICT"))
     if cached:
-        return CombinadoResponse(**cached)
+        return CombinadoResponse.model_validate(cached)
 
     socios_repo = SociosRepository(db)
     creditos_repo = CreditosRepository(db)
@@ -252,24 +263,30 @@ def registrar_combinado(
         aportes_input.append({"socio_data": s, "monto": item.monto})
 
     pagos_input = []
-    for item in body.pagos:
-        s = _get_socio_or_404(socios_repo, item.socio_id)
-        if creditos_repo.find_by_letra(item.letra_id) is None:
+    for pago_item in body.pagos:
+        s = _get_socio_or_404(socios_repo, pago_item.socio_id)
+        if creditos_repo.find_by_letra(pago_item.letra_id) is None:
             raise HTTPException(
                 status_code=404,
-                detail={"error": {"codigo": "LETRA_NO_ENCONTRADA", "mensaje": f"No existe un crédito con letra {item.letra_id}.", "detalle": None}},
+                detail={
+                    "error": {
+                        "codigo": "LETRA_NO_ENCONTRADA",
+                        "mensaje": f"No existe un crédito con letra {pago_item.letra_id}.",
+                        "detalle": None,
+                    }
+                },
             )
-        pagos_input.append({
-            "socio_data": s,
-            "letra_id": item.letra_id,
-            "n_cuotas": item.n_cuotas,
-            "abono_capital": item.abono_capital,
-        })
+        pagos_input.append(
+            {
+                "socio_data": s,
+                "letra_id": pago_item.letra_id,
+                "n_cuotas": pago_item.n_cuotas,
+                "abono_capital": pago_item.abono_capital,
+            }
+        )
 
-    n_cobrables = count_cobrables([item.socio_id for item in body.aportes])
-    svc = CombinadoService(
-        db, LiquidacionesRepository(db), AuxiliarRepository(db), ConfigRepository(db)
-    )
+    n_cobrables = count_cobrables([aporte_item.socio_id for aporte_item in body.aportes])
+    svc = CombinadoService(db, LiquidacionesRepository(db), AuxiliarRepository(db), ConfigRepository(db))
     try:
         resultado = svc.register(body.recibi_de_id, aportes_input, pagos_input, n_cobrables)
     except ValueError as exc:

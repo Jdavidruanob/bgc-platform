@@ -1,4 +1,8 @@
-from coop_core.utils.formato import format_full_name_for_excel, format_miles_colombian_int, parse_miles_colombian
+from coop_core.utils.formato import (
+    format_full_name_for_excel,
+    format_miles_colombian_int,
+    parse_miles_colombian,
+)
 
 
 def test_format_miles_simple() -> None:

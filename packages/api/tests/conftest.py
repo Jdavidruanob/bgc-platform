@@ -2,12 +2,12 @@
 
 import os
 import sqlite3
-from typing import Any, Generator
+from collections.abc import Generator
+from typing import Any
 
 import pytest
-from fastapi.testclient import TestClient
-
 from coop_core.db.schema import CONFIG_DEFAULTS, SCHEMA_SQL
+from fastapi.testclient import TestClient
 
 os.environ.setdefault("API_SECRET_TOKEN", "test-secret")
 

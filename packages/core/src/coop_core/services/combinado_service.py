@@ -46,12 +46,14 @@ class CombinadoService:
             socio_data = item["socio_data"]
             monto: int = item["monto"]
             saldo_antes = int(socio_data["saldo"])
-            aportes_for_exec.append({
-                "socio_data": socio_data,
-                "monto": monto,
-                "saldo_anterior": saldo_antes,
-                "saldo_nuevo": saldo_antes + monto,
-            })
+            aportes_for_exec.append(
+                {
+                    "socio_data": socio_data,
+                    "monto": monto,
+                    "saldo_anterior": saldo_antes,
+                    "saldo_nuevo": saldo_antes + monto,
+                }
+            )
 
         ops_pendientes: list[dict[str, Any]] = []
         pagos_para_recibo: dict[int, dict[str, Any]] = {}
@@ -126,34 +128,45 @@ class CombinadoService:
                 saldo_caja += monto
                 nombre = f"{sd['nombres']} {sd['apellidos']}"
                 self._auxiliar.add(
-                    fecha=fecha, tipo="Aporte", socio=nombre,
-                    monto=monto, saldo=saldo_caja, recibo=recibo_id,
+                    fecha=fecha,
+                    tipo="Aporte",
+                    socio=nombre,
+                    monto=monto,
+                    saldo=saldo_caja,
+                    recibo=recibo_id,
                 )
                 if nombre not in reporte_global:
                     reporte_global[nombre] = []
                 reporte_global[nombre].append(f"Aporte: ${monto}")
-                aportes_result.append({
-                    "socio_id": socio_id,
-                    "nombres": str(sd["nombres"]),
-                    "apellidos": str(sd["apellidos"]),
-                    "monto": monto,
-                    "saldo_anterior": ap["saldo_anterior"],
-                    "saldo_nuevo": ap["saldo_nuevo"],
-                    "cobro_papeleria": es_cobrable(socio_id),
-                })
+                aportes_result.append(
+                    {
+                        "socio_id": socio_id,
+                        "nombres": str(sd["nombres"]),
+                        "apellidos": str(sd["apellidos"]),
+                        "monto": monto,
+                        "saldo_anterior": ap["saldo_anterior"],
+                        "saldo_nuevo": ap["saldo_nuevo"],
+                        "cobro_papeleria": es_cobrable(socio_id),
+                    }
+                )
 
             for op in ops_pendientes:
                 saldo_caja, mora_total = execute_pago_op(
-                    cursor, self._liquidaciones, self._auxiliar,
-                    op, recibo_id, fecha, saldo_caja, mora_total,
-                    pagos_para_recibo, reporte_global,
+                    cursor,
+                    self._liquidaciones,
+                    self._auxiliar,
+                    op,
+                    recibo_id,
+                    fecha,
+                    saldo_caja,
+                    mora_total,
+                    pagos_para_recibo,
+                    reporte_global,
                 )
 
             monto_papeleria = PAPELERIA_POR_APORTE * count_cobrables
             self._config.set("saldo_en_caja", str(saldo_caja))
-            self._config.set(
-                "total_admin", str(total_admin + monto_papeleria + mora_total)
-            )
+            self._config.set("total_admin", str(total_admin + monto_papeleria + mora_total))
             self._conn.commit()
 
             pagos_list = list(pagos_para_recibo.values())

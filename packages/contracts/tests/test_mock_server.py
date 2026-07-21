@@ -3,9 +3,8 @@
 import uuid
 
 import pytest
-from fastapi.testclient import TestClient
-
 from coop_contracts.mock_server import app
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 AUTH = {"Authorization": "Bearer mock-secret"}
@@ -24,6 +23,7 @@ def reset():
 
 # ── Health ────────────────────────────────────────────────────────────────────
 
+
 def test_health_sin_auth():
     r = client.get("/health")
     assert r.status_code == 200
@@ -36,6 +36,7 @@ def test_endpoints_requieren_auth():
 
 
 # ── Socios ────────────────────────────────────────────────────────────────────
+
 
 def test_buscar_socios_pedro_devuelve_dos_homonimos():
     r = client.get("/socios?q=pedro", headers=AUTH)
@@ -88,6 +89,7 @@ def test_get_cuotas_letra_inexistente():
 
 # ── Caja ──────────────────────────────────────────────────────────────────────
 
+
 def test_get_caja():
     r = client.get("/caja", headers=AUTH)
     assert r.status_code == 200
@@ -97,6 +99,7 @@ def test_get_caja():
 
 
 # ── Aportes ───────────────────────────────────────────────────────────────────
+
 
 def test_registrar_aporte_simple():
     r = client.post(
@@ -160,6 +163,7 @@ def test_idempotencia_payload_diferente_retorna_409():
 
 # ── Retiros ───────────────────────────────────────────────────────────────────
 
+
 def test_registrar_retiro_valido():
     r = client.post(
         "/operaciones/retiros",
@@ -182,6 +186,7 @@ def test_retiro_saldo_insuficiente():
 
 
 # ── Pagos ─────────────────────────────────────────────────────────────────────
+
 
 def test_registrar_pago_una_cuota():
     r = client.post(
@@ -211,6 +216,7 @@ def test_pago_letra_inexistente():
 
 # ── Combinado ─────────────────────────────────────────────────────────────────
 
+
 def test_registrar_combinado():
     r = client.post(
         "/operaciones/combinados",
@@ -228,6 +234,7 @@ def test_registrar_combinado():
 
 
 # ── Notificaciones ────────────────────────────────────────────────────────────
+
 
 def test_get_notificaciones_pendientes():
     r = client.get("/notificaciones/pendientes", headers=AUTH)
@@ -258,6 +265,7 @@ def test_patch_notificacion_inexistente():
 
 
 # ── Notificador protocol ──────────────────────────────────────────────────────
+
 
 def test_mock_notificador_implementa_protocolo():
     from coop_contracts.notificador import MockNotificador, Notificador

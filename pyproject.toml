@@ -14,7 +14,7 @@ members = [
 ]
 
 [tool.ruff]
-line-length = 100
+line-length = 110
 target-version = "py312"
 
 [tool.ruff.lint]
@@ -23,6 +23,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.mypy]
 strict = true
 python_version = "3.12"
+exclude = ["mock_server\\.py", "mock_data\\.py", "conftest\\.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["packages"]
@@ -33,4 +34,5 @@ dev = [
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.15.22",
+    "types-python-dateutil>=2.9.0.20260716",
 ]

@@ -30,7 +30,7 @@ class NotificacionesRepository:
             """,
         )
         cols = [d[0] for d in cursor.description]
-        return [dict(zip(cols, row)) for row in cursor.fetchall()]
+        return [dict(zip(cols, row, strict=False)) for row in cursor.fetchall()]
 
     def update_estado(self, notif_id: int, estado: str, error: str | None = None) -> None:
         cursor = self._conn.cursor()

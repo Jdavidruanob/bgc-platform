@@ -1,7 +1,6 @@
 from typing import Any
 
 import pytest
-
 from coop_core.services.aporte_service import AporteService
 from coop_core.utils import fecha as fecha_mod
 
@@ -79,7 +78,7 @@ def test_aporte_rollback_on_error(repos: dict[str, Any]) -> None:
 
     # Provide non-existent socio_id in second aporte to trigger FK violation
     bad_data = {"id": 9999, "nombres": "X", "apellidos": "Y", "saldo": 0}
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017 — FK violation raises a DB-specific exception
         service.register(
             recibi_de_id=socio_id,
             aportes=[

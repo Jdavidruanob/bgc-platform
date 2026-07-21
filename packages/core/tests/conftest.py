@@ -4,11 +4,12 @@ SQLite in-memory adapter for testing coop-core.
 The adapter translates %s placeholders (psycopg3 style) to ? (sqlite3 style)
 and wraps rows so they are accessible both by index and by column name.
 """
+
 import sqlite3
-from typing import Any, Generator
+from collections.abc import Generator
+from typing import Any
 
 import pytest
-
 from coop_core.db.schema import CONFIG_DEFAULTS, SCHEMA_SQL
 from coop_core.repositories.auxiliar_repo import AuxiliarRepository
 from coop_core.repositories.config_repo import ConfigRepository
@@ -77,9 +78,7 @@ def _make_conn() -> SqliteTestConn:
     raw.commit()
     # Initialize config defaults
     for key, val in CONFIG_DEFAULTS.items():
-        raw.execute(
-            "INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)", (key, val)
-        )
+        raw.execute("INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)", (key, val))
     raw.commit()
     return conn
 

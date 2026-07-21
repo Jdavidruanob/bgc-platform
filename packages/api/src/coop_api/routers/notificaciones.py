@@ -1,12 +1,10 @@
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse
-
 from coop_contracts.respuestas import (
     NotificacionesPendientesResponse,
     NotificacionPendiente,
     PatchNotificacionRequest,
 )
 from coop_core.repositories.notificaciones_repo import NotificacionesRepository
+from fastapi import APIRouter
 
 from coop_api.deps import AuthDep, DbDep
 
@@ -36,7 +34,7 @@ def patch_notificacion(
     body: PatchNotificacionRequest,
     db: DbDep,
     _auth: AuthDep,
-) -> dict:
+) -> dict[str, object]:
     repo = NotificacionesRepository(db)
     repo.update_estado(notif_id, body.estado, body.error)
     db.commit()

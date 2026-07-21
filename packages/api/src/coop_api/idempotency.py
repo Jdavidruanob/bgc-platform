@@ -12,7 +12,7 @@ def _hash(payload: str) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def check(conn: DbConnection, key: str, endpoint: str, payload_json: str) -> dict | None:
+def check(conn: DbConnection, key: str, endpoint: str, payload_json: str) -> dict[str, object] | None:
     """
     Retorna el response guardado si la key ya existe con el mismo payload.
     Lanza ValueError si la key existe con payload diferente (409).
@@ -29,10 +29,13 @@ def check(conn: DbConnection, key: str, endpoint: str, payload_json: str) -> dic
     stored_hash, response_json = str(row[0]), str(row[1])
     if stored_hash != _hash(payload_json):
         raise ValueError("IDEMPOTENCY_CONFLICT")
-    return json.loads(response_json)
+    result: dict[str, object] = json.loads(response_json)
+    return result
 
 
-def store(conn: DbConnection, key: str, endpoint: str, payload_json: str, response: dict) -> None:
+def store(
+    conn: DbConnection, key: str, endpoint: str, payload_json: str, response: dict[str, object]
+) -> None:
     cursor = conn.cursor()
     cursor.execute(
         """
