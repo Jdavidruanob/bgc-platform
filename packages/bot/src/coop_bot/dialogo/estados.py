@@ -95,7 +95,6 @@ class SesionDialogo:
     pendientes: deque[SeleccionPendiente] = field(default_factory=deque)
     idempotency_key: str | None = None
     resumen_texto: str | None = None
-    texto_acumulado: str | None = None
     actualizado_en: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -117,20 +116,18 @@ class MaquinaEstados:
 
     async def procesar_intencion(self, intencion: Intencion) -> RespuestaDialogo:
         if isinstance(intencion, IntDesconocida):
-            self.sesion.texto_acumulado = None
             return self._quedarse_en_espera("No entendí tu mensaje. ¿Puedes repetirlo de otra forma?")
         if isinstance(intencion, IntIncompleta):
-            self.sesion.texto_acumulado = intencion.texto_original
-            pregunta = _pregunta_por_faltantes(intencion.intencion_detectada, intencion.campos_faltantes)
-            return self._quedarse_en_espera(pregunta)
+            faltantes = ", ".join(intencion.campos_faltantes)
+            return self._quedarse_en_espera(
+                f"Me falta información para procesar tu solicitud: {faltantes}. ¿Puedes completarla?"
+            )
         if isinstance(intencion, IntAmbigua):
-            self.sesion.texto_acumulado = None
             opciones = ", ".join(intencion.posibles_intenciones)
             return self._quedarse_en_espera(
-                f"No me quedó claro qué operación quieres hacer. ¿Te refieres a: {opciones}?"
+                f"No quedó claro qué operación quieres hacer. ¿Te refieres a: {opciones}?"
             )
         if isinstance(intencion, IntCrearCredito):
-            self.sesion.texto_acumulado = None
             return self._quedarse_en_espera("Esa función todavía no está disponible desde el bot.")
         if not isinstance(
             intencion,
@@ -142,10 +139,8 @@ class MaquinaEstados:
             | IntConsultarCuotas
             | IntConsultarCaja,
         ):
-            self.sesion.texto_acumulado = None
             return self._quedarse_en_espera("No pude procesar esa solicitud.")
 
-        self.sesion.texto_acumulado = None
         self.sesion.intencion = intencion
         self.sesion.estado = EstadoDialogo.PROCESANDO
         return await self._resolver_entidades_y_continuar()
@@ -433,7 +428,6 @@ class MaquinaEstados:
         self.sesion.pendientes = deque()
         self.sesion.idempotency_key = None
         self.sesion.resumen_texto = None
-        self.sesion.texto_acumulado = None
 
 
 # ── Helpers de módulo ──────────────────────────────────────────────────────────
@@ -471,36 +465,6 @@ def _nombres_letras(intencion: Intencion) -> list[tuple[str, str | None]]:
     if isinstance(intencion, IntConsultarCuotas):
         vistos.setdefault(intencion.socio, intencion.letra_id_hint)
     return list(vistos.items())
-
-
-_PREGUNTAS_POR_CAMPO: dict[str, str] = {
-    "monto": "¿Cuánto es?",
-    "socio": "¿De qué socio se trata?",
-    "recibi_de": "¿Quién trae el dinero?",
-    "nombre": "¿De qué socio?",
-    "nombre del socio aportante": "¿A nombre de qué socio va el aporte?",
-    "aportes": "¿Qué aporte se está registrando (socio y monto)?",
-    "pagos": "¿Qué pago se está registrando (socio, cuotas o abono)?",
-    "n_cuotas": "¿Cuántas cuotas está pagando?",
-    "abono_capital": "¿Cuánto abona a capital?",
-    "letra_id_hint": "¿Sabes el número de letra del crédito?",
-    "capital": "¿De cuánto es el crédito?",
-    "socios": "¿A nombre de quién queda el crédito?",
-}
-
-
-def _pregunta_por_faltantes(intencion_detectada: str, campos: list[str]) -> str:
-    preguntas = [_PREGUNTAS_POR_CAMPO.get(c, f"me falta {c}") for c in campos]
-    encabezado = {
-        "registrar_aporte": "Para registrar el aporte necesito un dato más:",
-        "registrar_retiro": "Para registrar el retiro necesito un dato más:",
-        "registrar_pago": "Para registrar el pago necesito un dato más:",
-        "registrar_combinado": "Para armar el recibo combinado necesito un dato más:",
-        "crear_credito": "Para el crédito necesito un dato más:",
-        "consultar_socio": "Necesito un dato para consultar el socio:",
-        "consultar_cuotas": "Necesito un dato para consultar las cuotas:",
-    }.get(intencion_detectada, "Me falta un dato:")
-    return f"{encabezado} {' '.join(preguntas)}"
 
 
 def _normalizar(texto: str) -> str:
