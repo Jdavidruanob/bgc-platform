@@ -367,3 +367,31 @@ def test_fuzzy_score():
     assert score_nombre("pedro", "Pedro Antonio", "Gómez Ruiz") >= 0.7
     assert score_nombre("Maria Lopez", "María", "López Herrera") >= 0.6
     assert score_nombre("xyz_no_existe", "Pedro", "Gómez") < 0.5
+
+
+def test_fuzzy_prioriza_nombre_sobre_apellido():
+    """Regresión: en la cooperativa hay muchos apellidos repetidos por parentesco.
+    "Maritza Padilla" debe puntuar más alto contra Maritza que contra otros Padilla.
+    """
+    from coop_api.fuzzy import score_nombre
+
+    score_maritza = score_nombre("Maritza Padilla", "Maritza Del S.", "Padilla Jojoa")
+    score_fanny = score_nombre("Maritza Padilla", "Fanny Patricia", "Padilla Jojoa")
+    score_francisco = score_nombre("Maritza Padilla", "Francisco Wilson", "Padilla Jojoa")
+
+    assert score_maritza > score_fanny
+    assert score_maritza > score_francisco
+    assert score_maritza - score_fanny >= 0.15  # brecha suficiente para auto-pick
+
+
+def test_fuzzy_tolerante_a_tildes_y_espacios_de_whisper():
+    """Whisper suele meter tildes de más y espacios raros. La búsqueda debe ser
+    tolerante a esas variaciones."""
+    from coop_api.fuzzy import score_nombre
+
+    # Con y sin tilde
+    assert score_nombre("Jose David Ruano", "Jose David", "Ruano Burbano") >= 0.85
+    assert score_nombre("José David Ruano", "Jose David", "Ruano Burbano") >= 0.85
+
+    # Query mayúsculas / minúsculas
+    assert score_nombre("PEDRO GOMEZ", "pedro", "gómez") >= 0.7
