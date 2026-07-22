@@ -80,8 +80,10 @@ async def on_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await enviar_texto(
         context,
         chat_id,
-        "Hola, soy el bot de la cooperativa. Cuéntame por texto o nota de voz qué "
-        "operación quieres registrar (aporte, retiro o pago).",
+        "Hola Álvaro, soy tu asistente de la cooperativa BGC. "
+        "Cuéntame por texto o nota de voz qué necesitas: registrar un aporte, "
+        "un pago de cuota, un retiro, o consultarme el saldo de un socio, "
+        "las cuotas pendientes de un crédito, o cuánto hay en caja.",
     )
 
 
@@ -136,8 +138,9 @@ async def _procesar_texto_entrante(update: Update, context: ContextTypes.DEFAULT
     elif sesion.estado == EstadoDialogo.ESPERANDO_CONFIRMACION:
         respuesta = await maquina.recibir_confirmacion(texto)
     elif sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE:
+        texto_para_llm = f"{sesion.texto_acumulado}. {texto}" if sesion.texto_acumulado else texto
         try:
-            intencion = await _llm_client(context).interpretar(texto)
+            intencion = await _llm_client(context).interpretar(texto_para_llm)
         except Exception:  # noqa: BLE001 - cualquier falla del LLM es recuperable
             logger.exception("Fallo al interpretar mensaje del chat %s", chat_id)
             await enviar_texto(context, chat_id, "No pude interpretar tu mensaje, intenta de nuevo.")
