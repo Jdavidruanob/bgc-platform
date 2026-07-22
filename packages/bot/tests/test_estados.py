@@ -28,8 +28,9 @@ async def test_intencion_incompleta_pide_completar(api_client: ApiClient) -> Non
         texto_original="le recibí a Pedro",
     )
     respuesta = await maquina.procesar_intencion(intencion)
-    assert "monto" in respuesta.texto
+    assert "Cuánto" in respuesta.texto
     assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert maquina.sesion.texto_acumulado == "le recibí a Pedro"
     assert respuesta.requiere_timeout is False
 
 
