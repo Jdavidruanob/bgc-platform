@@ -135,8 +135,27 @@ def test_parsear_seleccion_valida() -> None:
     assert parsear_seleccion("3", 3) == 2
 
 
+def test_parsear_seleccion_acepta_puntuacion_y_espacios() -> None:
+    assert parsear_seleccion("1.", 3) == 0
+    assert parsear_seleccion("2)", 3) == 1
+    assert parsear_seleccion(" 3 ", 3) == 2
+    assert parsear_seleccion("(1)", 3) == 0
+    assert parsear_seleccion("el 2", 3) == 1
+
+
+def test_parsear_seleccion_acepta_ordinales_en_espanol() -> None:
+    assert parsear_seleccion("uno", 3) == 0
+    assert parsear_seleccion("primero", 3) == 0
+    assert parsear_seleccion("el primero", 3) == 0
+    assert parsear_seleccion("segundo", 3) == 1
+    assert parsear_seleccion("la segunda", 3) == 1
+    assert parsear_seleccion("tercero", 3) == 2
+
+
 def test_parsear_seleccion_invalida() -> None:
     assert parsear_seleccion("0", 3) is None
     assert parsear_seleccion("4", 3) is None
     assert parsear_seleccion("no sé", 3) is None
     assert parsear_seleccion("", 3) is None
+    assert parsear_seleccion("undecimo", 3) is None
+    assert parsear_seleccion("Jose David Ruano", 3) is None

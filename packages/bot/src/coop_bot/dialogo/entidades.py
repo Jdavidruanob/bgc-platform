@@ -100,12 +100,66 @@ def formatear_lista_letras(candidatos: Sequence[CreditoResumen]) -> str:
     return "\n".join(lineas) + "\nResponde con el número de la opción correcta."
 
 
+_ORDINALES_ES: dict[str, int] = {
+    "uno": 1,
+    "primero": 1,
+    "primera": 1,
+    "primer": 1,
+    "dos": 2,
+    "segundo": 2,
+    "segunda": 2,
+    "tres": 3,
+    "tercero": 3,
+    "tercera": 3,
+    "tercer": 3,
+    "cuatro": 4,
+    "cuarto": 4,
+    "cuarta": 4,
+    "cinco": 5,
+    "quinto": 5,
+    "quinta": 5,
+    "seis": 6,
+    "sexto": 6,
+    "sexta": 6,
+    "siete": 7,
+    "septimo": 7,
+    "séptimo": 7,
+    "séptima": 7,
+    "ocho": 8,
+    "octavo": 8,
+    "octava": 8,
+    "nueve": 9,
+    "noveno": 9,
+    "novena": 9,
+    "diez": 10,
+    "decimo": 10,
+    "décimo": 10,
+    "décima": 10,
+}
+
+
 def parsear_seleccion(texto: str, n_opciones: int) -> int | None:
-    """Convierte '1'..'n' a un índice 0-based. None si no es válido."""
-    limpio = texto.strip()
-    if not limpio.isdigit():
+    """Convierte selección del operador a índice 0-based. None si no es válida.
+
+    Acepta: "1", "1.", "1)", "el 1", "el primero", "primero", "uno",
+    o el nombre exacto/parcial que aparece en la lista mostrada.
+    """
+    limpio = texto.strip().lower().rstrip(".)-").lstrip("(")
+    if limpio.startswith("el "):
+        limpio = limpio[3:].strip()
+    if limpio.startswith("la "):
+        limpio = limpio[3:].strip()
+
+    if limpio.isdigit():
+        indice = int(limpio) - 1
+        if 0 <= indice < n_opciones:
+            return indice
         return None
-    indice = int(limpio) - 1
-    if 0 <= indice < n_opciones:
-        return indice
+
+    if limpio in _ORDINALES_ES:
+        indice = _ORDINALES_ES[limpio] - 1
+        if 0 <= indice < n_opciones:
+            return indice
+        return None
+
     return None
