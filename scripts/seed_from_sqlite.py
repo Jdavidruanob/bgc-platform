@@ -65,10 +65,11 @@ def main() -> None:
         print("[seed] Insertando datos maestros...")
         _insertar_socios(pg, socios)
         _insertar_creditos(pg, creditos)
-        pg.executemany(
-            "INSERT INTO socio_credito (socio_id, credito_letra) VALUES (%s, %s)",
-            [(r["socio_id"], r["credito_letra"]) for r in socio_cred],
-        )
+        with pg.cursor() as cur:
+            cur.executemany(
+                "INSERT INTO socio_credito (socio_id, credito_letra) VALUES (%s, %s)",
+                [(r["socio_id"], r["credito_letra"]) for r in socio_cred],
+            )
         _insertar_liquidaciones(pg, liquidaciones)
 
         print(f"[seed] Actualizando saldo_en_caja = {suma_saldos:,}...")
@@ -104,7 +105,7 @@ def _verificar_destino_vacio(pg: Any) -> None:
         if n > 0:
             sys.exit(f"[ABORT] Postgres ya tiene {n} socios. Este script solo corre en DB vacía.")
     except Exception:
-        pass
+        pg.rollback()  # tabla no existe aún — resetear transacción abortada
 
 
 def _crear_schema(pg: Any) -> None:
@@ -120,20 +121,18 @@ def _crear_schema(pg: Any) -> None:
 def _insertar_socios(pg: Any, socios: list[dict[str, Any]]) -> None:
     columnas = ["id", "cc", "nombres", "apellidos", "saldo", "celular",
                 "photo_path", "whatsapp_e164", "optin_whatsapp_fecha", "created_at"]
-    pg.executemany(
-        f"INSERT INTO socios ({', '.join(columnas)}) OVERRIDING SYSTEM VALUE "
-        f"VALUES ({', '.join(['%s'] * len(columnas))})",
-        [tuple(s.get(c) for c in columnas) for s in socios],
-    )
+    sql = (f"INSERT INTO socios ({', '.join(columnas)}) OVERRIDING SYSTEM VALUE "
+           f"VALUES ({', '.join(['%s'] * len(columnas))})")
+    with pg.cursor() as cur:
+        cur.executemany(sql, [tuple(s.get(c) for c in columnas) for s in socios])
 
 
 def _insertar_creditos(pg: Any, creditos: list[dict[str, Any]]) -> None:
     columnas = ["letra", "capital", "interes", "no_cuotas", "fecha_inicio"]
-    pg.executemany(
-        f"INSERT INTO creditos ({', '.join(columnas)}) OVERRIDING SYSTEM VALUE "
-        f"VALUES ({', '.join(['%s'] * len(columnas))})",
-        [tuple(c.get(col) for col in columnas) for c in creditos],
-    )
+    sql = (f"INSERT INTO creditos ({', '.join(columnas)}) OVERRIDING SYSTEM VALUE "
+           f"VALUES ({', '.join(['%s'] * len(columnas))})")
+    with pg.cursor() as cur:
+        cur.executemany(sql, [tuple(c.get(col) for col in columnas) for c in creditos])
 
 
 def _insertar_liquidaciones(pg: Any, liquidaciones: list[dict[str, Any]]) -> None:
@@ -141,11 +140,10 @@ def _insertar_liquidaciones(pg: Any, liquidaciones: list[dict[str, Any]]) -> Non
                 "valor_cuota", "interes_mes", "cuota_mensual", "saldo_capital",
                 "fecha_pago", "interes_mora", "mora_aplicada",
                 "notif_prev_enviada", "notif_venc_enviada"]
-    pg.executemany(
-        f"INSERT INTO liquidaciones ({', '.join(columnas)}) OVERRIDING SYSTEM VALUE "
-        f"VALUES ({', '.join(['%s'] * len(columnas))})",
-        [tuple(liq.get(c) for c in columnas) for liq in liquidaciones],
-    )
+    sql = (f"INSERT INTO liquidaciones ({', '.join(columnas)}) OVERRIDING SYSTEM VALUE "
+           f"VALUES ({', '.join(['%s'] * len(columnas))})")
+    with pg.cursor() as cur:
+        cur.executemany(sql, [tuple(liq.get(c) for c in columnas) for liq in liquidaciones])
 
 
 def _resetear_secuencias(pg: Any) -> None:
