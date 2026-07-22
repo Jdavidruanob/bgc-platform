@@ -1,0 +1,20 @@
+FROM python:3.12-slim
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+WORKDIR /app
+
+COPY pyproject.toml uv.lock ./
+COPY packages/core/pyproject.toml packages/core/
+COPY packages/contracts/pyproject.toml packages/contracts/
+COPY packages/api/pyproject.toml packages/api/
+COPY packages/bot/pyproject.toml packages/bot/
+COPY packages/desktop/pyproject.toml packages/desktop/
+
+RUN uv sync --package coop-bot --no-dev --frozen
+
+COPY packages/core/src packages/core/src
+COPY packages/contracts/src packages/contracts/src
+COPY packages/bot/src packages/bot/src
+
+CMD ["uv", "run", "--package", "coop-bot", "python", "-m", "coop_bot.main", "--modo=polling"]
