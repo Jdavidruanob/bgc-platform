@@ -6,7 +6,15 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from coop_api.postgres_schema import CONFIG_DEFAULTS, SCHEMA_POSTGRES
-from coop_api.routers import caja, creditos, health, notificaciones, operaciones, socios
+from coop_api.routers import (
+    caja,
+    creditos,
+    health,
+    notificaciones,
+    operaciones,
+    recibos_archivos,
+    socios,
+)
 
 
 @asynccontextmanager
@@ -34,6 +42,7 @@ app.include_router(caja.router)
 app.include_router(creditos.router)
 app.include_router(operaciones.router)
 app.include_router(notificaciones.router)
+app.include_router(recibos_archivos.router)
 
 
 @app.exception_handler(Exception)

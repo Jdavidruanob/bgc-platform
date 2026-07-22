@@ -119,6 +119,15 @@ CREATE TABLE IF NOT EXISTS audit_log (
     operacion_id INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS recibos_archivos (
+    recibo_id INTEGER PRIMARY KEY,
+    tipo TEXT NOT NULL,
+    xlsx_bytes BLOB NOT NULL,
+    pdf_bytes BLOB NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (recibo_id) REFERENCES recibos(id)
+);
 """
 
 CONFIG_DEFAULTS = {

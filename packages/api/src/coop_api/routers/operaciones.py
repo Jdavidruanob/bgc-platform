@@ -33,6 +33,7 @@ from fastapi.responses import JSONResponse
 import coop_api.idempotency as idem
 from coop_api.deps import AuthDep, DbDep
 from coop_api.errors import value_error_to_response
+from coop_api.recibos import wire as recibos_wire
 
 router = APIRouter(prefix="/operaciones", tags=["operaciones"])
 
@@ -117,6 +118,7 @@ def registrar_aportes(
         papeleria_cobrada=papeleria,
         saldo_caja_nuevo=resultado["nuevo_saldo_caja"],
     )
+    recibos_wire.guardar_recibo_aporte(db, resultado, recibi_de)
     idem.store(db, idem_key, "POST /operaciones/aportes", payload_json, resp.model_dump())
     db.commit()
     return resp
@@ -156,6 +158,7 @@ def registrar_retiro(
         saldo_nuevo=resultado["saldo_nuevo"],
         saldo_caja_nuevo=resultado["nuevo_saldo_caja"],
     )
+    recibos_wire.guardar_recibo_retiro(db, resultado, socio)
     idem.store(db, idem_key, "POST /operaciones/retiros", payload_json, resp.model_dump())
     db.commit()
     return resp
@@ -232,6 +235,7 @@ def registrar_pagos(
         pagos=pagos_resp,
         saldo_caja_nuevo=resultado["nuevo_saldo_caja"],
     )
+    recibos_wire.guardar_recibo_pago(db, resultado, recibi_de)
     idem.store(db, idem_key, "POST /operaciones/pagos", payload_json, resp.model_dump())
     db.commit()
     return resp
@@ -328,6 +332,7 @@ def registrar_combinado(
         papeleria_cobrada=papeleria,
         saldo_caja_nuevo=resultado["nuevo_saldo_caja"],
     )
+    recibos_wire.guardar_recibo_combinado(db, resultado, recibi_de, n_cobrables)
     idem.store(db, idem_key, "POST /operaciones/combinados", payload_json, resp.model_dump())
     db.commit()
     return resp

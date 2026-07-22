@@ -135,6 +135,21 @@ class ApiClient:
         """Solo para tests: reinicia el estado del mock server (`POST /test/reset`)."""
         await self._client.post("/test/reset")
 
+    # ── Recibos ──────────────────────────────────────────────────────────────
+
+    async def descargar_pdf_recibo(self, recibo_id: int) -> bytes | None:
+        """Devuelve los bytes del PDF del recibo generado por el API.
+
+        None si el API responde 404 (no hay archivo aún, p.ej. entorno de dev
+        sin LibreOffice). Cualquier otro error se propaga como ApiError.
+        """
+        response = await self._pedir(lambda: self._client.get(f"/recibos/{recibo_id}/pdf"))
+        if response.status_code == 404:
+            return None
+        if response.is_error:
+            self._lanzar_error(response)
+        return response.content
+
     # ── Internos ─────────────────────────────────────────────────────────────
 
     async def _get(self, path: str, params: dict[str, Any], modelo: type[T]) -> T:

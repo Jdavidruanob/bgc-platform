@@ -401,7 +401,11 @@ class MaquinaEstados:
             resp_combinado = await self.cliente.registrar_combinado(body_combinado, key)
             datos = recibo_desde_combinado(resp_combinado)
 
-        pdf_bytes = generar_pdf_recibo(datos)
+        # Primero se intenta el PDF autoritativo generado por el API a partir
+        # de las plantillas Excel del BGC-software. Si el API no lo tiene
+        # (entorno sin LibreOffice) se cae al PDF simple de reportlab.
+        pdf_bytes_api = await self.cliente.descargar_pdf_recibo(datos.recibo_id)
+        pdf_bytes = pdf_bytes_api if pdf_bytes_api is not None else generar_pdf_recibo(datos)
         return pdf_bytes, nombre_archivo_recibo(datos.recibo_id)
 
     def _pago_req_items(self, pagos: list[PagoItem]) -> list[PagoReqItem]:
