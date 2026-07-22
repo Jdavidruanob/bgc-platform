@@ -138,9 +138,7 @@ async def _procesar_texto_entrante(update: Update, context: ContextTypes.DEFAULT
     elif sesion.estado == EstadoDialogo.ESPERANDO_CONFIRMACION:
         respuesta = await maquina.recibir_confirmacion(texto)
     elif sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE:
-        texto_para_llm = (
-            f"{sesion.texto_acumulado}. {texto}" if sesion.texto_acumulado else texto
-        )
+        texto_para_llm = f"{sesion.texto_acumulado}. {texto}" if sesion.texto_acumulado else texto
         try:
             intencion = await _llm_client(context).interpretar(texto_para_llm)
         except Exception:  # noqa: BLE001 - cualquier falla del LLM es recuperable
