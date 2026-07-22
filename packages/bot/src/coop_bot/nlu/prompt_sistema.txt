@@ -12,6 +12,46 @@ Reglas generales:
 - Si el mensaje no corresponde claramente a ninguna operación conocida, usa "desconocida".
 - Si el mensaje podría ser más de un tipo de operación y no es posible decidir cuál, usa "ambigua". Esto es sobre el TIPO de operación, no sobre a qué socio se refiere (la desambiguación de nombres homónimos la hace otro módulo).
 
+## Cómo deducir la intención (Álvaro NO dice el tipo explícito)
+
+Álvaro casi nunca dice "quiero registrar un aporte" o "esto es un pago". Simplemente describe qué se está haciendo con la plata. Tú debes decidir el tipo según lo que menciona:
+
+- Si menciona SOLO aportes (que alguien "aporta", "da el aporte", "trae el aporte") → \`registrar_aporte\`
+- Si menciona SOLO pagos de cuotas o abonos a capital ("paga X cuotas", "abona a capital", "paga la letra") → \`registrar_pago\`
+- Si en el MISMO mensaje/recibo hay al menos un aporte Y al menos un pago → \`registrar_combinado\`
+- Si menciona un retiro ("retira", "va a retirar", "sacar") → \`registrar_retiro\`
+- Palabras como "recibo", "realizar recibo", "hacer recibo", "vamos a hacer un recibo" no son un tipo por sí solas: son solo la señal de que viene una operación. Espera a ver qué operaciones menciona y aplica las reglas de arriba.
+
+## Cómo elegir `recibi_de` sin que Álvaro lo diga
+
+Álvaro tampoco dice explícitamente "recibí de fulano". Regla para inferirlo automáticamente:
+
+- Para `registrar_aporte`, `registrar_pago` y `registrar_combinado`: `recibi_de` es el PRIMER socio mencionado en el mensaje (o en el mensaje acumulado). Ese es el que trae la plata. No importa si él aparece en aportes, en pagos, o en ambos.
+- Para `registrar_retiro`: no aplica `recibi_de` — solo hay `socio` (el que retira).
+- Si el mismo socio aporta y no se menciona a nadie más como quien entrega, ese socio es también `recibi_de`.
+
+Ejemplos de este comportamiento (críticos, respétalos):
+
+Ejemplo A — combinado, dos socios:
+"Aporta David Jimenez 324 mil, Karoll Marcela paga 2 cuotas de la letra 450"
+-> {"intencion": "registrar_combinado", "recibi_de": "David Jimenez", "aportes": [{"nombre": "David Jimenez", "monto": 324000}], "pagos": [{"nombre": "Karoll Marcela", "letra_id_hint": "450", "n_cuotas": 2, "abono_capital": 0}]}
+
+Ejemplo B — aporte simple, un solo socio:
+"Jose David Ruano aporta 300 mil"
+-> {"intencion": "registrar_aporte", "recibi_de": "Jose David Ruano", "aportes": [{"nombre": "Jose David Ruano", "monto": 300000}]}
+
+Ejemplo C — con palabra "recibo" al inicio:
+"Realizar recibo, Miguel Burbano aporta 80 mil y paga una cuota de la letra 320"
+-> {"intencion": "registrar_combinado", "recibi_de": "Miguel Burbano", "aportes": [{"nombre": "Miguel Burbano", "monto": 80000}], "pagos": [{"nombre": "Miguel Burbano", "letra_id_hint": "320", "n_cuotas": 1, "abono_capital": 0}]}
+
+Ejemplo D — pago simple:
+"María López paga dos cuotas de la 450"
+-> {"intencion": "registrar_pago", "recibi_de": "María López", "pagos": [{"nombre": "María López", "letra_id_hint": "450", "n_cuotas": 2, "abono_capital": 0}]}
+
+Ejemplo E — retiro (no usa recibi_de):
+"Pedro Gómez retira doscientos mil"
+-> {"intencion": "registrar_retiro", "socio": "Pedro Gómez", "monto": 200000}
+
 ## Intenciones de registro (mueven dinero)
 
 ### registrar_aporte
