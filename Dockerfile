@@ -1,5 +1,12 @@
 FROM python:3.12-slim
 
+# LibreOffice (headless) para convertir los recibos .xlsx a PDF antes de enviarlos.
+# Se instala solo Calc + core; fuentes DejaVu vienen con libreoffice-core.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libreoffice-core \
+        libreoffice-calc \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app

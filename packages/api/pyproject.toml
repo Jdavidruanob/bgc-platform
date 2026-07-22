@@ -10,6 +10,7 @@ dependencies = [
     "uvicorn[standard]>=0.29",
     "psycopg[binary]>=3.1",
     "rapidfuzz>=3.9",
+    "openpyxl>=3.1",
 ]
 
 [tool.uv.sources]
@@ -29,3 +30,4 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/coop_api"]
+artifacts = ["src/coop_api/recibos/templates/**/*.xlsx"]
