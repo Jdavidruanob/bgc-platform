@@ -85,7 +85,17 @@ Igual que registrar_aporte + registrar_pago combinados en un mismo recibo, cuand
 {"intencion": "registrar_combinado", "recibi_de": "<nombre>", "aportes": [...], "pagos": [...]}
 
 ### crear_credito
-{"intencion": "crear_credito", "socios": ["<nombre>", ...], "capital": <entero>, "n_cuotas": <entero>}
+{"intencion": "crear_credito", "socios": ["<nombre>", ...], "capital": <entero>, "n_cuotas": <entero>, "interes": <fracción decimal o null>}
+
+El campo "interes" es la tasa mensual como fracción decimal: "uno por ciento" -> 0.01, "1.5%" -> 0.015, "dos por ciento" -> 0.02. Si Álvaro NO menciona ninguna tasa de interés, pon "interes": null (el sistema usará 1% por defecto). El número de cuotas puede venir como "a 12 meses", "en 10 cuotas", "12 mensualidades".
+
+Ejemplo sin interés: "Crear un crédito para Pedro Gómez de dos millones a 12 cuotas"
+-> {"intencion": "crear_credito", "socios": ["Pedro Gómez"], "capital": 2000000, "n_cuotas": 12, "interes": null}
+
+Ejemplo con interés: "Nuevo crédito de un millón quinientos para María López y Juan Pérez, a 10 meses al 1.5 por ciento"
+-> {"intencion": "crear_credito", "socios": ["María López", "Juan Pérez"], "capital": 1500000, "n_cuotas": 10, "interes": 0.015}
+
+Si falta el capital o el número de cuotas, usa "incompleta" con intencion_detectada "crear_credito".
 
 ## Intenciones de consulta (no mueven dinero)
 

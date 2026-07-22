@@ -42,6 +42,14 @@ class CombinadosRequest(BaseModel):
     pagos: list[PagoReqItem] = Field(default_factory=list)
 
 
+class CrearCreditoRequest(BaseModel):
+    socio_ids: list[int] = Field(..., min_length=1)
+    capital: Annotated[int, Field(gt=0)]
+    n_cuotas: Annotated[int, Field(gt=0)]
+    # Tasa mensual en fracción (0.01 = 1%). Si es None, el API usa el default.
+    interes: float | None = None
+
+
 # ── Respuestas de consulta ────────────────────────────────────────────────────
 
 
@@ -171,6 +179,26 @@ class CombinadoResponse(BaseModel):
     pagos: list[PagoResultItem]
     papeleria_cobrada: int
     saldo_caja_nuevo: int
+
+
+class CuotaAmortizacion(BaseModel):
+    nro_cuota: int
+    fecha_vencimiento: str
+    valor_cuota: int
+    interes_mes: int
+    cuota_mensual: int
+    saldo_capital: int
+
+
+class CrearCreditoResponse(BaseModel):
+    letra_id: int
+    fecha: str
+    socios: list[SocioRef]
+    capital: int
+    interes: float
+    n_cuotas: int
+    saldo_caja_nuevo: int
+    tabla_amortizacion: list[CuotaAmortizacion]
 
 
 # ── Notificaciones ────────────────────────────────────────────────────────────

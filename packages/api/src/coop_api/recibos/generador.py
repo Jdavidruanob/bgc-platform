@@ -67,6 +67,28 @@ class DatosRecibo:
     socio_retiro: SocioBasico | None = None
 
 
+@dataclass(frozen=True)
+class CuotaLiquidacion:
+    nro_cuota: int
+    fecha_vencimiento: str
+    valor_cuota: int
+    interes_mes: int
+    cuota_mensual: int
+    saldo_capital: int
+
+
+@dataclass
+class DatosLiquidacion:
+    letra_id: int
+    capital: int
+    interes: float
+    n_cuotas: int
+    fecha_inicio: date
+    socios: list[SocioBasico]
+    valor_cuota_base: int
+    cuotas: list[CuotaLiquidacion]
+
+
 # ── Utilidades comunes ────────────────────────────────────────────────────────
 
 
@@ -247,5 +269,90 @@ def generar_xlsx_combinado(datos: DatosRecibo) -> bytes:
     ws[f"K{row_general}"] = format_miles_colombian_int(
         total_aportes + total_creditos + gastos_admin + total_mora
     )
+
+    return _guardar(wb)
+
+
+# ── Liquidación de crédito ────────────────────────────────────────────────────
+
+_LIQ_TABLA_START_ROW = 14
+_LIQ_TABLA_HEADERS = [
+    "Fecha",
+    "Cuota",
+    "Valor Cuota",
+    "Intereses",
+    "Total Mensual",
+    "Saldo Capital",
+    "Fecha Pago",
+]
+_LIQ_TABLA_COLUMNS = ["A", "B", "C", "D", "E", "F", "G"]
+_LIQ_FIRMA_TESORERO = "Tesorero: ALVARO L. BURBANO GARCIA"
+
+
+def generar_xlsx_liquidacion(datos: DatosLiquidacion) -> bytes:
+    """Calca `utils/credit_liquidation_generator.py` del BGC-software.
+
+    La tabla de amortización viene ya calculada (misma lógica de
+    `coop_core.services.amortization`), aquí solo se vuelca a la plantilla.
+    """
+    from openpyxl.styles import Border, Font, Side
+
+    borde = Border(
+        left=Side(style="thin", color="FF000000"),
+        right=Side(style="thin", color="FF000000"),
+        top=Side(style="thin", color="FF000000"),
+        bottom=Side(style="thin", color="FF000000"),
+    )
+    fuente_header = Font(bold=True)
+    centro = Alignment(horizontal="center", vertical="center")
+
+    wb = _abrir_plantilla("recibo_template_liquidacion.xlsx")
+    ws = wb.active
+
+    ws["B7"] = datos.letra_id
+    ws["F7"] = format_miles_colombian_int(datos.capital)
+    socios_nombres = [f"{s.nombres} {s.apellidos}".upper() for s in datos.socios]
+    ws["B9"] = ", Y/O ".join(socios_nombres)
+    ws["A12"] = datos.fecha_inicio.strftime("%Y-%m-%d")
+    ws["B12"] = datos.n_cuotas
+    ws["C12"] = format_miles_colombian_int(datos.valor_cuota_base)
+    ws["D12"] = f"{datos.interes * 100:.2f}%"
+    ws["F12"] = format_miles_colombian_int(datos.capital)
+
+    fila = _LIQ_TABLA_START_ROW
+    for col_idx, header in enumerate(_LIQ_TABLA_HEADERS):
+        celda = ws[f"{_LIQ_TABLA_COLUMNS[col_idx]}{fila}"]
+        celda.value = header
+        celda.font = fuente_header
+        celda.alignment = centro
+        celda.border = borde
+
+    fila += 1
+    for cuota in datos.cuotas:
+        valores = [
+            cuota.fecha_vencimiento,
+            str(cuota.nro_cuota),
+            format_miles_colombian_int(cuota.valor_cuota),
+            format_miles_colombian_int(cuota.interes_mes),
+            format_miles_colombian_int(cuota.cuota_mensual),
+            format_miles_colombian_int(max(0, cuota.saldo_capital)),
+            "",
+        ]
+        for col_idx, valor in enumerate(valores):
+            celda = ws[f"{_LIQ_TABLA_COLUMNS[col_idx]}{fila}"]
+            celda.value = valor
+            celda.alignment = centro
+            celda.border = borde
+        fila += 1
+
+    for col in _LIQ_TABLA_COLUMNS:
+        ws.column_dimensions[col].width = 15
+
+    fila_firma = fila + 2
+    ws.merge_cells(start_row=fila_firma, start_column=1, end_row=fila_firma, end_column=7)
+    celda_firma = ws[f"A{fila_firma}"]
+    celda_firma.value = _LIQ_FIRMA_TESORERO
+    celda_firma.alignment = centro
+    celda_firma.font = Font(bold=True, size=12)
 
     return _guardar(wb)

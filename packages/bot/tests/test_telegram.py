@@ -5,7 +5,7 @@ from coop_bot.adaptadores import telegram as bot_telegram
 from coop_bot.config import Config
 from coop_bot.dialogo.estados import EstadoDialogo, SesionDialogo
 from coop_contracts.intenciones import IntConsultarCaja, IntCrearCredito
-from coop_contracts.respuestas import CajaEstado
+from coop_contracts.respuestas import CajaEstado, SocioDetalle, SocioSearchItem, SociosSearchResponse
 
 OPERADOR_CHAT_ID = 999
 
@@ -15,7 +15,7 @@ def _build_config() -> Config:
         coop_api_base_url="http://localhost:8001",
         coop_api_token="mock-secret",
         telegram_bot_token="123:abc",
-        telegram_operador_chat_id=OPERADOR_CHAT_ID,
+        telegram_operador_chat_ids=(OPERADOR_CHAT_ID,),
         openai_api_key="sk-test",
     )
 
@@ -106,18 +106,38 @@ async def test_on_text_consulta_caja_responde_con_el_saldo() -> None:
     assert "$5.830.000" in kwargs["text"]
 
 
-async def test_on_text_crear_credito_muestra_stub() -> None:
+async def test_on_text_crear_credito_pide_confirmacion() -> None:
     context = _contexto()
     context.bot_data["llm_client"].interpretar = AsyncMock(
-        return_value=IntCrearCredito(intencion="crear_credito", socios=["Pedro Gómez"], capital=1, n_cuotas=1)
+        return_value=IntCrearCredito(
+            intencion="crear_credito", socios=["Carmenza Suárez"], capital=1200000, n_cuotas=12
+        )
     )
-    update = _update(OPERADOR_CHAT_ID, texto="crea un crédito para Pedro")
+    context.bot_data["api_client"].buscar_socios = AsyncMock(
+        return_value=SociosSearchResponse(
+            socios=[
+                SocioSearchItem(
+                    id=4,
+                    nombres="Carmenza",
+                    apellidos="Suárez Peña",
+                    nombre_completo="Carmenza Suárez Peña",
+                    score=0.95,
+                )
+            ]
+        )
+    )
+    context.bot_data["api_client"].get_socio = AsyncMock(
+        return_value=SocioDetalle(
+            id=4, nombres="Carmenza", apellidos="Suárez Peña", celular="", saldo=180000, creditos_activos=0
+        )
+    )
+    update = _update(OPERADOR_CHAT_ID, texto="crea un crédito para Carmenza, un millón a 12 cuotas")
 
     await bot_telegram.on_text(update, context)
 
     context.bot.send_message.assert_awaited_once()
     _, kwargs = context.bot.send_message.call_args
-    assert "no está disponible" in kwargs["text"].lower()
+    assert "Nuevo crédito" in kwargs["text"]
 
 
 async def test_on_text_falla_llm_responde_mensaje_generico() -> None:

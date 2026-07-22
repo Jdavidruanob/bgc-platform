@@ -53,13 +53,26 @@ async def test_intencion_ambigua(api_client: ApiClient) -> None:
     assert "registrar_aporte" in respuesta.texto
 
 
-async def test_crear_credito_es_un_stub(api_client: ApiClient) -> None:
+async def test_crear_credito_pide_confirmacion(api_client: ApiClient) -> None:
     maquina = _maquina(api_client)
     respuesta = await maquina.procesar_intencion(
-        IntCrearCredito(intencion="crear_credito", socios=["Pedro Gómez"], capital=1, n_cuotas=1)
+        IntCrearCredito(intencion="crear_credito", socios=["Carmenza Suárez"], capital=1200000, n_cuotas=12)
     )
-    assert "no está disponible" in respuesta.texto.lower()
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_CONFIRMACION
+    assert "Nuevo crédito" in respuesta.texto
+    assert "1.200.000" in respuesta.texto
+    assert "12 mensuales" in respuesta.texto
+
+
+async def test_crear_credito_flujo_completo(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    await maquina.procesar_intencion(
+        IntCrearCredito(intencion="crear_credito", socios=["Carmenza Suárez"], capital=1200000, n_cuotas=12)
+    )
+    respuesta = await maquina.recibir_confirmacion("sí")
     assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert "Crédito creado" in respuesta.texto
+    assert "Letra" in respuesta.texto
 
 
 # ── Consultas (B-15) ──────────────────────────────────────────────────────────

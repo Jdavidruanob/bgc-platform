@@ -64,6 +64,9 @@ class IntCrearCredito(BaseModel):
     socios: list[str] = Field(..., min_length=1, description="Nombres de los socios titulares")
     capital: Annotated[int, Field(gt=0)] = Field(..., description="Monto del crédito en pesos")
     n_cuotas: Annotated[int, Field(gt=0)] = Field(..., description="Número de cuotas mensuales")
+    interes: float | None = Field(
+        default=None, description="Tasa mensual en fracción (0.01 = 1%). Null si no se mencionó."
+    )
 
 
 class IntConsultarSocio(BaseModel):

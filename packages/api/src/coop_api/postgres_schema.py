@@ -122,6 +122,13 @@ CREATE TABLE IF NOT EXISTS recibos_archivos (
     pdf_bytes       BYTEA NOT NULL,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS liquidaciones_archivos (
+    letra_id        INTEGER PRIMARY KEY REFERENCES creditos(letra),
+    xlsx_bytes      BYTEA NOT NULL,
+    pdf_bytes       BYTEA NOT NULL,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 CONFIG_DEFAULTS = {

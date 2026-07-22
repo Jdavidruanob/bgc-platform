@@ -34,6 +34,7 @@ from coop_contracts.respuestas import (
     AporteReqItem,
     AportesRequest,
     CombinadosRequest,
+    CrearCreditoRequest,
     CreditoResumen,
     PagoReqItem,
     PagosRequest,
@@ -129,15 +130,13 @@ class MaquinaEstados:
             return self._quedarse_en_espera(
                 f"No me quedó claro qué operación quieres hacer. ¿Te refieres a: {opciones}?"
             )
-        if isinstance(intencion, IntCrearCredito):
-            self.sesion.texto_acumulado = None
-            return self._quedarse_en_espera("Esa función todavía no está disponible desde el bot.")
         if not isinstance(
             intencion,
             IntRegAporte
             | IntRegRetiro
             | IntRegPago
             | IntRegCombinado
+            | IntCrearCredito
             | IntConsultarSocio
             | IntConsultarCuotas
             | IntConsultarCaja,
@@ -174,8 +173,13 @@ class MaquinaEstados:
         if self.sesion.idempotency_key is None:
             self.sesion.idempotency_key = str(uuid4())
 
+        es_credito = isinstance(self.sesion.intencion, IntCrearCredito)
         try:
-            pdf_bytes, nombre_pdf = await self._ejecutar_operacion()
+            if es_credito:
+                texto_ok, pdf_bytes, nombre_pdf = await self._ejecutar_crear_credito()
+            else:
+                texto_ok = "Listo, aquí está tu comprobante."
+                pdf_bytes, nombre_pdf = await self._ejecutar_operacion()
         except ApiError as exc:
             self._reset_operacion()
             self.sesion.estado = EstadoDialogo.ESPERANDO_MENSAJE
@@ -185,7 +189,7 @@ class MaquinaEstados:
         self._reset_operacion()
         self.sesion.estado = EstadoDialogo.ESPERANDO_MENSAJE
         return RespuestaDialogo(
-            texto="Listo, aquí está tu comprobante.",
+            texto=texto_ok,
             documento_pdf=pdf_bytes,
             nombre_documento=nombre_pdf,
             cancelar_timeout=True,
@@ -408,6 +412,35 @@ class MaquinaEstados:
         pdf_bytes = pdf_bytes_api if pdf_bytes_api is not None else generar_pdf_recibo(datos)
         return pdf_bytes, nombre_archivo_recibo(datos.recibo_id)
 
+    async def _ejecutar_crear_credito(self) -> tuple[str, bytes | None, str | None]:
+        intencion = self.sesion.intencion
+        key = self.sesion.idempotency_key
+        assert isinstance(intencion, IntCrearCredito)
+        assert key is not None
+
+        body = CrearCreditoRequest(
+            socio_ids=[self.sesion.socios[n].id for n in intencion.socios],
+            capital=intencion.capital,
+            n_cuotas=intencion.n_cuotas,
+            interes=intencion.interes,
+        )
+        resp = await self.cliente.crear_credito(body, key)
+
+        cuota_capital = resp.tabla_amortizacion[0].valor_cuota if resp.tabla_amortizacion else 0
+        primera_cuota_total = resp.tabla_amortizacion[0].cuota_mensual if resp.tabla_amortizacion else 0
+        texto = (
+            f"Crédito creado. Letra {resp.letra_id}.\n"
+            f"Capital: {formatear_monto(resp.capital)}\n"
+            f"{resp.n_cuotas} cuotas · interés {resp.interes * 100:.2f}% mensual\n"
+            f"Cuota a capital: {formatear_monto(cuota_capital)} "
+            f"(primera cuota total ~{formatear_monto(primera_cuota_total)})\n"
+            f"Saldo en caja: {formatear_monto(resp.saldo_caja_nuevo)}"
+        )
+
+        pdf_bytes = await self.cliente.descargar_pdf_liquidacion(resp.letra_id)
+        nombre_pdf = f"Liquidacion_letra_{resp.letra_id}.pdf" if pdf_bytes is not None else None
+        return texto, pdf_bytes, nombre_pdf
+
     def _pago_req_items(self, pagos: list[PagoItem]) -> list[PagoReqItem]:
         return [
             PagoReqItem(
@@ -457,6 +490,8 @@ def _nombres_socios(intencion: Intencion) -> list[str]:
         nombres.append(intencion.recibi_de)
         nombres += [a.nombre for a in intencion.aportes]
         nombres += [p.nombre for p in intencion.pagos]
+    elif isinstance(intencion, IntCrearCredito):
+        nombres += list(intencion.socios)
     elif isinstance(intencion, IntConsultarSocio | IntConsultarCuotas):
         nombres.append(intencion.socio)
     return list(dict.fromkeys(nombres))

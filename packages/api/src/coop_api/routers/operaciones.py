@@ -10,6 +10,9 @@ from coop_contracts.respuestas import (
     AportesResponse,
     CombinadoResponse,
     CombinadosRequest,
+    CrearCreditoRequest,
+    CrearCreditoResponse,
+    CuotaAmortizacion,
     PagoResultItem,
     PagosRequest,
     PagosResponse,
@@ -25,6 +28,7 @@ from coop_core.repositories.liquidaciones_repo import LiquidacionesRepository
 from coop_core.repositories.socios_repo import SociosRepository
 from coop_core.services.aporte_service import AporteService
 from coop_core.services.combinado_service import CombinadoService
+from coop_core.services.credito_service import CreditoService
 from coop_core.services.pago_service import PagoService
 from coop_core.services.retiro_service import RetiroService
 from fastapi import APIRouter, Header, HTTPException
@@ -334,5 +338,61 @@ def registrar_combinado(
     )
     recibos_wire.guardar_recibo_combinado(db, resultado, recibi_de, n_cobrables)
     idem.store(db, idem_key, "POST /operaciones/combinados", payload_json, resp.model_dump())
+    db.commit()
+    return resp
+
+
+_INTERES_DEFAULT = 0.01  # 1% mensual, mismo default que el BGC-software original
+
+
+@router.post("/creditos", status_code=201, response_model=None)
+def crear_credito(
+    body: CrearCreditoRequest,
+    db: DbDep,
+    _auth: AuthDep,
+    idempotency_key: IdempDep = None,  # type: ignore[assignment]
+) -> CrearCreditoResponse | JSONResponse:
+    idem_key = _require_idem(idempotency_key)
+    payload_json = body.model_dump_json()
+    try:
+        cached = idem.check(db, idem_key, "POST /operaciones/creditos", payload_json)
+    except ValueError:
+        return value_error_to_response(ValueError("IDEMPOTENCY_CONFLICT"))
+    if cached:
+        return CrearCreditoResponse.model_validate(cached)
+
+    socios_repo = SociosRepository(db)
+    socios_data = [_get_socio_or_404(socios_repo, sid) for sid in body.socio_ids]
+    interes = body.interes if body.interes is not None else _INTERES_DEFAULT
+
+    svc = CreditoService(
+        db,
+        CreditosRepository(db),
+        LiquidacionesRepository(db),
+        AuxiliarRepository(db),
+        ConfigRepository(db),
+    )
+    try:
+        resultado = svc.create(body.socio_ids, body.capital, interes, body.n_cuotas, socios_data)
+    except ValueError as exc:
+        return value_error_to_response(exc)
+
+    resp = CrearCreditoResponse(
+        letra_id=resultado["letra_id"],
+        fecha=resultado["fecha"],
+        socios=[
+            SocioRef(id=int(s["id"]), nombre_completo=f"{s['nombres']} {s['apellidos']}")
+            for s in resultado["socios"]
+        ],
+        capital=resultado["capital"],
+        interes=resultado["interes"],
+        n_cuotas=resultado["n_cuotas"],
+        saldo_caja_nuevo=resultado["nuevo_saldo_caja"],
+        tabla_amortizacion=[CuotaAmortizacion(**c) for c in resultado["tabla_amortizacion"]],
+    )
+    # CreditoService.create ya hizo commit del crédito. La liquidación y la clave
+    # de idempotencia se guardan en transacciones posteriores.
+    recibos_wire.guardar_liquidacion_credito(db, resultado)
+    idem.store(db, idem_key, "POST /operaciones/creditos", payload_json, resp.model_dump())
     db.commit()
     return resp

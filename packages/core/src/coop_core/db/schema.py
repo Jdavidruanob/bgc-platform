@@ -128,6 +128,14 @@ CREATE TABLE IF NOT EXISTS recibos_archivos (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (recibo_id) REFERENCES recibos(id)
 );
+
+CREATE TABLE IF NOT EXISTS liquidaciones_archivos (
+    letra_id INTEGER PRIMARY KEY,
+    xlsx_bytes BLOB NOT NULL,
+    pdf_bytes BLOB NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (letra_id) REFERENCES creditos(letra)
+);
 """
 
 CONFIG_DEFAULTS = {

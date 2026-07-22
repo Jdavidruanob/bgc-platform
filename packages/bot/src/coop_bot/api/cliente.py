@@ -12,6 +12,8 @@ from coop_contracts.respuestas import (
     CajaEstado,
     CombinadoResponse,
     CombinadosRequest,
+    CrearCreditoRequest,
+    CrearCreditoResponse,
     CreditosResponse,
     CuotasPendientesResponse,
     NotificacionesPendientesResponse,
@@ -129,6 +131,9 @@ class ApiClient:
     async def registrar_combinado(self, body: CombinadosRequest, idempotency_key: str) -> CombinadoResponse:
         return await self._post("/operaciones/combinados", body, idempotency_key, CombinadoResponse)
 
+    async def crear_credito(self, body: CrearCreditoRequest, idempotency_key: str) -> CrearCreditoResponse:
+        return await self._post("/operaciones/creditos", body, idempotency_key, CrearCreditoResponse)
+
     # ── Test utilities ───────────────────────────────────────────────────────
 
     async def resetear_mock(self) -> None:
@@ -144,6 +149,15 @@ class ApiClient:
         sin LibreOffice). Cualquier otro error se propaga como ApiError.
         """
         response = await self._pedir(lambda: self._client.get(f"/recibos/{recibo_id}/pdf"))
+        if response.status_code == 404:
+            return None
+        if response.is_error:
+            self._lanzar_error(response)
+        return response.content
+
+    async def descargar_pdf_liquidacion(self, letra_id: int) -> bytes | None:
+        """PDF de la liquidación de un crédito. None si el API responde 404."""
+        response = await self._pedir(lambda: self._client.get(f"/creditos/{letra_id}/liquidacion/pdf"))
         if response.status_code == 404:
             return None
         if response.is_error:

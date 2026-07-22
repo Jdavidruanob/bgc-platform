@@ -4,10 +4,11 @@ from coop_core.repositories.liquidaciones_repo import LiquidacionesRepository
 from coop_core.services.amortization import calculate_mora
 from coop_core.utils.fecha import get_hoy
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from coop_api.deps import AuthDep, DbDep
 from coop_api.errors import not_found
+from coop_api.recibos.repositorio import LiquidacionesArchivosRepository
 
 router = APIRouter(prefix="/creditos", tags=["creditos"])
 
@@ -55,4 +56,28 @@ def get_cuotas_pendientes(
         letra_id=letra_id,
         deuda_total_actual=deuda_total,
         cuotas_pendientes=cuotas,
+    )
+
+
+@router.get("/{letra_id}/liquidacion/pdf", response_model=None)
+def descargar_liquidacion_pdf(letra_id: int, db: DbDep, _auth: AuthDep) -> Response | JSONResponse:
+    pdf = LiquidacionesArchivosRepository(db).obtener_pdf(letra_id)
+    if pdf is None:
+        return not_found("LIQUIDACION_NO_ENCONTRADA", f"No hay liquidación PDF para la letra {letra_id}.")
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="Liquidacion_letra_{letra_id}.pdf"'},
+    )
+
+
+@router.get("/{letra_id}/liquidacion/xlsx", response_model=None)
+def descargar_liquidacion_xlsx(letra_id: int, db: DbDep, _auth: AuthDep) -> Response | JSONResponse:
+    xlsx = LiquidacionesArchivosRepository(db).obtener_xlsx(letra_id)
+    if xlsx is None:
+        return not_found("LIQUIDACION_NO_ENCONTRADA", f"No hay liquidación Excel para la letra {letra_id}.")
+    return Response(
+        content=xlsx,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="Liquidacion_letra_{letra_id}.xlsx"'},
     )

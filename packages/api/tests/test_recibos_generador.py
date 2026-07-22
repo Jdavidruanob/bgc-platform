@@ -9,12 +9,15 @@ import io
 from datetime import date
 
 from coop_api.recibos.generador import (
+    CuotaLiquidacion,
+    DatosLiquidacion,
     DatosRecibo,
     LineaAporte,
     LineaPago,
     SocioBasico,
     generar_xlsx_aporte,
     generar_xlsx_combinado,
+    generar_xlsx_liquidacion,
     generar_xlsx_pago,
     generar_xlsx_retiro,
 )
@@ -134,3 +137,54 @@ def test_combinado_usa_matriz_x_y() -> None:
     # Pago 3 filas después del total de aportes (row_total=10, start_creditos=13)
     assert ws["F13"].value == 450
     assert ws["G13"].value == "2-3/10"
+
+
+def test_liquidacion_llena_cabecera_y_tabla() -> None:
+    datos = DatosLiquidacion(
+        letra_id=77,
+        capital=1200000,
+        interes=0.01,
+        n_cuotas=3,
+        fecha_inicio=date(2026, 7, 22),
+        socios=[SocioBasico(nombres="Pedro", apellidos="Gómez Ruiz")],
+        valor_cuota_base=400000,
+        cuotas=[
+            CuotaLiquidacion(
+                nro_cuota=1,
+                fecha_vencimiento="2026-08-22",
+                valor_cuota=400000,
+                interes_mes=12000,
+                cuota_mensual=412000,
+                saldo_capital=800000,
+            ),
+            CuotaLiquidacion(
+                nro_cuota=2,
+                fecha_vencimiento="2026-09-22",
+                valor_cuota=400000,
+                interes_mes=8000,
+                cuota_mensual=408000,
+                saldo_capital=400000,
+            ),
+            CuotaLiquidacion(
+                nro_cuota=3,
+                fecha_vencimiento="2026-10-22",
+                valor_cuota=400000,
+                interes_mes=4000,
+                cuota_mensual=404000,
+                saldo_capital=0,
+            ),
+        ],
+    )
+    ws = _abrir(generar_xlsx_liquidacion(datos))
+    assert ws["B7"].value == 77
+    assert "1.200.000" in str(ws["F7"].value)
+    assert "PEDRO GÓMEZ RUIZ" in str(ws["B9"].value)
+    assert ws["B12"].value == 3
+    assert ws["D12"].value == "1.00%"
+    # Encabezados de la tabla en fila 14
+    assert ws["A14"].value == "Fecha"
+    assert ws["G14"].value == "Fecha Pago"
+    # Primera cuota en fila 15
+    assert ws["A15"].value == "2026-08-22"
+    assert ws["B15"].value == "1"
+    assert "12.000" in str(ws["D15"].value)

@@ -319,6 +319,57 @@ def test_combinado(client: TestClient, socio_pedro, socio_maria, credito_pedro):
     assert len(data["pagos"]) == 1
 
 
+# ── Crear crédito ─────────────────────────────────────────────────────────────
+
+
+def test_crear_credito_genera_tabla_amortizacion(client: TestClient, socio_pedro):
+    r = client.post(
+        "/operaciones/creditos",
+        json={"socio_ids": [socio_pedro], "capital": 1200000, "n_cuotas": 12},
+        headers=_idem(),
+    )
+    assert r.status_code == 201
+    data = r.json()
+    assert data["letra_id"] is not None
+    assert data["interes"] == 0.01  # default del BGC-software
+    assert data["n_cuotas"] == 12
+    assert len(data["tabla_amortizacion"]) == 12
+    # La primera cuota tiene interés sobre el capital completo
+    primera = data["tabla_amortizacion"][0]
+    assert primera["nro_cuota"] == 1
+    assert primera["interes_mes"] == round(1200000 * 0.01)
+
+
+def test_crear_credito_respeta_interes_explicito(client: TestClient, socio_pedro):
+    r = client.post(
+        "/operaciones/creditos",
+        json={"socio_ids": [socio_pedro], "capital": 600000, "n_cuotas": 6, "interes": 0.02},
+        headers=_idem(),
+    )
+    assert r.status_code == 201
+    data = r.json()
+    assert data["interes"] == 0.02
+    assert data["tabla_amortizacion"][0]["interes_mes"] == round(600000 * 0.02)
+
+
+def test_crear_credito_capital_invalido(client: TestClient, socio_pedro):
+    r = client.post(
+        "/operaciones/creditos",
+        json={"socio_ids": [socio_pedro], "capital": 0, "n_cuotas": 6},
+        headers=_idem(),
+    )
+    assert r.status_code == 422  # pydantic gt=0
+
+
+def test_crear_credito_sin_idempotency_key(client: TestClient, socio_pedro):
+    r = client.post(
+        "/operaciones/creditos",
+        json={"socio_ids": [socio_pedro], "capital": 600000, "n_cuotas": 6},
+        headers=AUTH,
+    )
+    assert r.status_code == 400
+
+
 # ── Notificaciones ────────────────────────────────────────────────────────────
 
 

@@ -26,8 +26,30 @@ def test_desde_entorno_lee_todas_las_variables(monkeypatch: pytest.MonkeyPatch) 
     assert cfg.coop_api_token == "mock-secret"
     assert cfg.telegram_bot_token == "123:abc"
     assert cfg.telegram_operador_chat_id == 987654321
+    assert cfg.telegram_operador_chat_ids == (987654321,)
     assert cfg.openai_api_key == "sk-test"
     assert cfg.log_level == "DEBUG"
+
+
+def test_desde_entorno_multiples_operadores(monkeypatch: pytest.MonkeyPatch) -> None:
+    _set_env(monkeypatch)
+    monkeypatch.delenv("TELEGRAM_OPERADOR_CHAT_ID", raising=False)
+    monkeypatch.setenv("TELEGRAM_OPERADOR_CHAT_IDS", "111, 222 ,333")
+
+    cfg = Config.desde_entorno()
+
+    assert cfg.telegram_operador_chat_ids == (111, 222, 333)
+    assert cfg.es_operador_autorizado(222)
+    assert not cfg.es_operador_autorizado(999)
+
+
+def test_desde_entorno_plural_tiene_prioridad(monkeypatch: pytest.MonkeyPatch) -> None:
+    _set_env(monkeypatch)
+    monkeypatch.setenv("TELEGRAM_OPERADOR_CHAT_IDS", "111,222")
+
+    cfg = Config.desde_entorno()
+
+    assert cfg.telegram_operador_chat_ids == (111, 222)
 
 
 def test_desde_entorno_log_level_default(monkeypatch: pytest.MonkeyPatch) -> None:

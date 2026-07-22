@@ -16,7 +16,7 @@ def _config(**overrides: object) -> Config:
         "coop_api_base_url": "http://localhost:8001",
         "coop_api_token": "mock-secret",
         "telegram_bot_token": "123:abc",
-        "telegram_operador_chat_id": 999,
+        "telegram_operador_chat_ids": (999,),
         "openai_api_key": "sk-test",
     }
     base.update(overrides)

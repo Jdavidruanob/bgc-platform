@@ -72,3 +72,34 @@ class RecibosArchivosRepository:
         )
         cols = [d[0] for d in cursor.description]
         return [dict(zip(cols, row, strict=False)) for row in cursor.fetchall()]
+
+
+class LiquidacionesArchivosRepository:
+    def __init__(self, conn: DbConnection) -> None:
+        self._conn = conn
+
+    def guardar(self, letra_id: int, xlsx_bytes: bytes, pdf_bytes: bytes) -> None:
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO liquidaciones_archivos (letra_id, xlsx_bytes, pdf_bytes)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (letra_id) DO UPDATE SET
+                xlsx_bytes = EXCLUDED.xlsx_bytes,
+                pdf_bytes = EXCLUDED.pdf_bytes,
+                created_at = CURRENT_TIMESTAMP
+            """,
+            (letra_id, xlsx_bytes, pdf_bytes),
+        )
+
+    def obtener_pdf(self, letra_id: int) -> bytes | None:
+        cursor = self._conn.cursor()
+        cursor.execute("SELECT pdf_bytes FROM liquidaciones_archivos WHERE letra_id = %s", (letra_id,))
+        row = cursor.fetchone()
+        return bytes(row[0]) if row else None
+
+    def obtener_xlsx(self, letra_id: int) -> bytes | None:
+        cursor = self._conn.cursor()
+        cursor.execute("SELECT xlsx_bytes FROM liquidaciones_archivos WHERE letra_id = %s", (letra_id,))
+        row = cursor.fetchone()
+        return bytes(row[0]) if row else None

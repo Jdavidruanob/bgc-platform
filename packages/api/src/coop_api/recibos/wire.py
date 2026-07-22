@@ -19,13 +19,19 @@ from coop_core.repositories.creditos_repo import CreditosRepository
 
 from coop_api.recibos import generador
 from coop_api.recibos.generador import (
+    CuotaLiquidacion,
+    DatosLiquidacion,
     DatosRecibo,
     LineaAporte,
     LineaPago,
     SocioBasico,
 )
 from coop_api.recibos.pdf_converter import PdfConversionError, xlsx_a_pdf
-from coop_api.recibos.repositorio import RecibosArchivosRepository, TipoRecibo
+from coop_api.recibos.repositorio import (
+    LiquidacionesArchivosRepository,
+    RecibosArchivosRepository,
+    TipoRecibo,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -158,3 +164,46 @@ def guardar_recibo_combinado(
     )
     xlsx = generador.generar_xlsx_combinado(datos)
     _persistir(db, datos.recibo_id, "combinado", xlsx)
+
+
+def guardar_liquidacion_credito(db: DbConnection, resultado: dict[str, Any]) -> None:
+    """Genera la liquidación xlsx→pdf y la persiste. El crédito ya fue creado y
+    commiteado por CreditoService; esta persistencia va en su propia transacción.
+    Si LibreOffice no está (dev/tests), se salta sin romper.
+    """
+    if not _soffice_disponible():
+        logger.warning("soffice no disponible; se salta la liquidación del crédito %s", resultado["letra_id"])
+        return
+
+    tabla = resultado["tabla_amortizacion"]
+    valor_cuota_base = int(tabla[0]["valor_cuota"]) if tabla else 0
+    datos = DatosLiquidacion(
+        letra_id=int(resultado["letra_id"]),
+        capital=int(resultado["capital"]),
+        interes=float(resultado["interes"]),
+        n_cuotas=int(resultado["n_cuotas"]),
+        fecha_inicio=_a_date(resultado["fecha"]),
+        socios=[
+            SocioBasico(nombres=str(s["nombres"]), apellidos=str(s["apellidos"])) for s in resultado["socios"]
+        ],
+        valor_cuota_base=valor_cuota_base,
+        cuotas=[
+            CuotaLiquidacion(
+                nro_cuota=int(c["nro_cuota"]),
+                fecha_vencimiento=str(c["fecha_vencimiento"]),
+                valor_cuota=int(c["valor_cuota"]),
+                interes_mes=int(c["interes_mes"]),
+                cuota_mensual=int(c["cuota_mensual"]),
+                saldo_capital=int(c["saldo_capital"]),
+            )
+            for c in tabla
+        ],
+    )
+    xlsx = generador.generar_xlsx_liquidacion(datos)
+    try:
+        pdf = xlsx_a_pdf(xlsx)
+    except PdfConversionError:
+        logger.exception("Fallo al convertir la liquidación del crédito %s", datos.letra_id)
+        raise
+    LiquidacionesArchivosRepository(db).guardar(datos.letra_id, xlsx, pdf)
+    db.commit()

@@ -303,4 +303,4 @@ def _chat_id(update: Update) -> int:
 def _es_operador(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     if update.effective_chat is None:
         return False
-    return bool(update.effective_chat.id == _config(context).telegram_operador_chat_id)
+    return _config(context).es_operador_autorizado(int(update.effective_chat.id))

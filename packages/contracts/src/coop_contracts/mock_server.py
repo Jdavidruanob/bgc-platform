@@ -22,8 +22,11 @@ from coop_contracts.respuestas import (
     CajaEstado,
     CombinadoResponse,
     CombinadosRequest,
+    CrearCreditoRequest,
+    CrearCreditoResponse,
     CreditoResumen,
     CreditosResponse,
+    CuotaAmortizacion,
     CuotaPendiente,
     CuotasPendientesResponse,
     ErrorDetail,
@@ -481,6 +484,60 @@ def registrar_combinado(
         pagos=pagos_result,
         papeleria_cobrada=papeleria_total,
         saldo_caja_nuevo=_state["caja"]["saldo_en_caja"],
+    )
+    _store_idempotency(idem_key, payload_hash, resp.model_dump())
+    return resp
+
+
+@app.post("/operaciones/creditos", status_code=201)
+def crear_credito(
+    body: CrearCreditoRequest,
+    _auth: AuthDep = None,
+    idem_key: IdempDep = None,
+) -> CrearCreditoResponse:
+    payload_hash = hash(body.model_dump_json())
+    cached = _check_idempotency(idem_key, payload_hash)
+    if cached:
+        return CrearCreditoResponse(**cached)
+
+    socios = [_find_socio(sid) for sid in body.socio_ids]
+    interes = body.interes if body.interes is not None else 0.01
+    letra_id = 900 + len(_state["creditos"]) + 1
+
+    # Amortización simplificada del mock (cuota lineal + interés sobre saldo).
+    cuota_base = body.capital // body.n_cuotas
+    tabla: list[CuotaAmortizacion] = []
+    saldo = body.capital
+    for i in range(body.n_cuotas):
+        nro = i + 1
+        cap = body.capital - cuota_base * (body.n_cuotas - 1) if nro == body.n_cuotas else cuota_base
+        interes_mes = round(saldo * interes)
+        saldo = max(saldo - cap, 0)
+        tabla.append(
+            CuotaAmortizacion(
+                nro_cuota=nro,
+                fecha_vencimiento=_today(),
+                valor_cuota=cap,
+                interes_mes=interes_mes,
+                cuota_mensual=cap + interes_mes,
+                saldo_capital=saldo,
+            )
+        )
+
+    _state["caja"]["saldo_en_caja"] -= body.capital
+    _state["creditos"].append(
+        {"letra": letra_id, "capital": body.capital, "interes": interes, "no_cuotas": body.n_cuotas}
+    )
+
+    resp = CrearCreditoResponse(
+        letra_id=letra_id,
+        fecha=_today(),
+        socios=[SocioRef(id=s["id"], nombre_completo=make_nombre_completo(s)) for s in socios],
+        capital=body.capital,
+        interes=interes,
+        n_cuotas=body.n_cuotas,
+        saldo_caja_nuevo=_state["caja"]["saldo_en_caja"],
+        tabla_amortizacion=tabla,
     )
     _store_idempotency(idem_key, payload_hash, resp.model_dump())
     return resp

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from coop_contracts.intenciones import (
+    IntCrearCredito,
     Intencion,
     IntRegAporte,
     IntRegCombinado,
@@ -14,6 +15,8 @@ from coop_contracts.intenciones import (
 from coop_bot.dialogo.entidades import SocioResuelto
 
 PROMPT_CONFIRMACION = "¿Confirmas esta operación? Responde sí o no."
+
+_INTERES_DEFAULT = 0.01
 
 
 def formatear_monto(monto: int) -> str:
@@ -34,7 +37,26 @@ def construir_resumen(
         return _resumen_pago(intencion, socios, letras)
     if isinstance(intencion, IntRegCombinado):
         return _resumen_combinado(intencion, socios, letras)
+    if isinstance(intencion, IntCrearCredito):
+        return _resumen_crear_credito(intencion, socios)
     raise ValueError(f"construir_resumen no soporta la intención {intencion.intencion!r}")
+
+
+def _resumen_crear_credito(intencion: IntCrearCredito, socios: dict[str, SocioResuelto]) -> str:
+    nombres = [socios[n].nombre_completo for n in intencion.socios]
+    interes = intencion.interes if intencion.interes is not None else _INTERES_DEFAULT
+    cuota_aprox = intencion.capital // intencion.n_cuotas
+    lineas = [
+        "Nuevo crédito:",
+        f"- Titular(es): {', '.join(nombres)}",
+        f"- Capital: {formatear_monto(intencion.capital)}",
+        f"- Cuotas: {intencion.n_cuotas} mensuales",
+        f"- Interés: {interes * 100:.2f}% mensual",
+        f"- Cuota aprox. a capital: {formatear_monto(cuota_aprox)}",
+        "",
+        PROMPT_CONFIRMACION,
+    ]
+    return "\n".join(lineas)
 
 
 def _resumen_aporte(intencion: IntRegAporte, socios: dict[str, SocioResuelto]) -> str:
