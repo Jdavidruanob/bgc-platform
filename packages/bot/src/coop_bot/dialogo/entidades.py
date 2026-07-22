@@ -42,6 +42,10 @@ class ResolucionLetra:
     candidatos: list[CreditoResumen] = field(default_factory=list)
 
 
+_UMBRAL_SCORE_GANADOR = 0.85
+_UMBRAL_BRECHA_GANADOR = 0.25
+
+
 async def resolver_socio(cliente: ApiClient, nombre: str) -> ResolucionSocio:
     resp = await cliente.buscar_socios(nombre)
     candidatos = resp.socios
@@ -50,16 +54,33 @@ async def resolver_socio(cliente: ApiClient, nombre: str) -> ResolucionSocio:
         return ResolucionSocio(query=nombre, estado="no_encontrado")
 
     if len(candidatos) == 1:
-        elegido = candidatos[0]
-        detalle = await cliente.get_socio(elegido.id)
-        resuelto = SocioResuelto(
-            id=elegido.id,
-            nombre_completo=elegido.nombre_completo,
-            saldo=detalle.saldo,
-        )
-        return ResolucionSocio(query=nombre, estado="resuelto", resuelto=resuelto)
+        return await _resolver_unico(cliente, nombre, candidatos[0])
+
+    if _tiene_ganador_claro(candidatos):
+        return await _resolver_unico(cliente, nombre, candidatos[0])
 
     return ResolucionSocio(query=nombre, estado="ambiguo", candidatos=candidatos)
+
+
+async def _resolver_unico(cliente: ApiClient, nombre: str, elegido: SocioSearchItem) -> ResolucionSocio:
+    detalle = await cliente.get_socio(elegido.id)
+    resuelto = SocioResuelto(
+        id=elegido.id,
+        nombre_completo=elegido.nombre_completo,
+        saldo=detalle.saldo,
+    )
+    return ResolucionSocio(query=nombre, estado="resuelto", resuelto=resuelto)
+
+
+def _tiene_ganador_claro(candidatos: list[SocioSearchItem]) -> bool:
+    """Auto-selección cuando el mejor candidato es claramente superior.
+
+    Álvaro escribe el nombre de un socio conocido; si el fuzzy match del backend
+    devuelve un ganador con score >= 0.85 y ventaja >= 0.25 sobre el segundo,
+    preguntar es ruido, no seguridad.
+    """
+    mejor, segundo = candidatos[0], candidatos[1]
+    return mejor.score >= _UMBRAL_SCORE_GANADOR and (mejor.score - segundo.score) >= _UMBRAL_BRECHA_GANADOR
 
 
 async def resolver_letra(cliente: ApiClient, socio_id: int, letra_hint: str | None) -> ResolucionLetra:

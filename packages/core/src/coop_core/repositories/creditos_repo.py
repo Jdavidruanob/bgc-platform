@@ -49,13 +49,9 @@ class CreditosRepository:
         cursor = self._conn.cursor()
         cursor.execute(
             """
-            SELECT c.letra, c.capital, c.interes, c.no_cuotas, c.fecha_inicio,
-                   GROUP_CONCAT(s.nombres || ' ' || s.apellidos, ', ') AS socios_nombres
-            FROM creditos c
-            JOIN socio_credito sc ON sc.credito_letra = c.letra
-            JOIN socios s ON s.id = sc.socio_id
-            WHERE c.letra = %s
-            GROUP BY c.letra
+            SELECT letra, capital, interes, no_cuotas, fecha_inicio
+            FROM creditos
+            WHERE letra = %s
             """,
             (letra,),
         )
@@ -63,7 +59,20 @@ class CreditosRepository:
         if row is None:
             return None
         cols = [d[0] for d in cursor.description]
-        return dict(zip(cols, row, strict=False))
+        credito = dict(zip(cols, row, strict=False))
+
+        cursor.execute(
+            """
+            SELECT s.nombres, s.apellidos
+            FROM socios s
+            JOIN socio_credito sc ON sc.socio_id = s.id
+            WHERE sc.credito_letra = %s
+            """,
+            (letra,),
+        )
+        nombres = [f"{r[0]} {r[1]}" for r in cursor.fetchall()]
+        credito["socios_nombres"] = ", ".join(nombres)
+        return credito
 
     def find_active_by_socio_id(self, socio_id: int) -> list[dict[str, Any]]:
         cursor = self._conn.cursor()
