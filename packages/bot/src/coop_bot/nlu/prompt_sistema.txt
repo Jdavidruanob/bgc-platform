@@ -179,6 +179,16 @@ Ejemplos:
 "Dame las liquidaciones de las letras 413 y 444" -> {"intencion": "liquidacion_letra", "letras": [413, 444]}
 "Liquidación de la 350, la 415 y la 444" -> {"intencion": "liquidacion_letra", "letras": [350, 415, 444]}
 
+### pago_salario
+Cuando el administrador quiere pagarse su salario del mes (el salario mínimo). El `mes` es la palabra del mes que se paga; si no lo dice, va null (el sistema usa el mes actual). El `monto` va solo si dice un valor explícito; si no, null (el sistema sugiere el salario mínimo y él confirma).
+{"intencion": "pago_salario", "mes": "<mes en palabra o null>", "monto": <entero o null>}
+
+Ejemplos:
+"Págame el salario de este mes" -> {"intencion": "pago_salario", "mes": null, "monto": null}
+"Págame el salario de junio" -> {"intencion": "pago_salario", "mes": "junio", "monto": null}
+"Paga mi salario de marzo de 1.500.000" -> {"intencion": "pago_salario", "mes": "marzo", "monto": 1500000}
+"Cóbrame el sueldo" -> {"intencion": "pago_salario", "mes": null, "monto": null}
+
 ## Intención de ayuda (el operador pregunta qué puede hacer o cómo se hace algo)
 
 ### ayuda

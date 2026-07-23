@@ -142,6 +142,11 @@ CONFIG_DEFAULTS = {
     "saldo_en_caja": "0",
     "total_admin": "0",
     "porcentaje_mora": "0.02",
+    # Salario del administrador (salario mínimo vigente). Valor guardado que el
+    # operador confirma o modifica al pagar. Se siembra con el mínimo de 2025.
+    "salario_minimo": "1423500",
+    # Socio al que se le hace el recibo de salario (el tesorero/administrador).
+    "tesorero_socio_id": "1",
 }
 
 # Migraciones idempotentes para BD ya existentes. `CREATE TABLE IF NOT EXISTS`

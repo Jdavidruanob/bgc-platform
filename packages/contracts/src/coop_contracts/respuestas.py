@@ -50,6 +50,11 @@ class CrearCreditoRequest(BaseModel):
     interes: float | None = None
 
 
+class SalarioRequest(BaseModel):
+    mes: str = Field(..., description="Mes que se paga, en palabra: 'Junio', 'Marzo'...")
+    monto: Annotated[int, Field(gt=0)]
+
+
 # ── Respuestas de consulta ────────────────────────────────────────────────────
 
 
@@ -142,6 +147,10 @@ class CajaEstado(BaseModel):
     administracion_total: int = 0
 
 
+class SalarioConfig(BaseModel):
+    salario_guardado: int
+
+
 # ── Respuestas de operación ───────────────────────────────────────────────────
 
 
@@ -227,6 +236,14 @@ class CrearCreditoResponse(BaseModel):
     n_cuotas: int
     saldo_caja_nuevo: int
     tabla_amortizacion: list[CuotaAmortizacion]
+
+
+class SalarioResponse(BaseModel):
+    recibo_id: int
+    fecha: str
+    mes: str
+    monto: int
+    saldo_caja_nuevo: int
 
 
 # ── Notificaciones ────────────────────────────────────────────────────────────

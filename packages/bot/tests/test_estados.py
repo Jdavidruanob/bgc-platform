@@ -14,6 +14,7 @@ from coop_contracts.intenciones import (
     IntIncompleta,
     IntLiquidacionLetra,
     IntListarSocios,
+    IntPagoSalario,
     IntRegAporte,
     IntRegCombinado,
     IntRegPago,
@@ -309,6 +310,29 @@ async def test_combinado_aportes_mas_pago_todas_letras(api_client: ApiClient) ->
     respuesta2 = await maquina.recibir_confirmacion("sí")
     assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
     assert respuesta2.documento_pdf is not None
+
+
+async def test_pago_salario_con_monto_explicito(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    respuesta = await maquina.procesar_intencion(
+        IntPagoSalario(intencion="pago_salario", mes="junio", monto=1500000)
+    )
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_CONFIRMACION
+    assert "Junio" in respuesta.texto
+    assert "1.500.000" in respuesta.texto
+
+    respuesta2 = await maquina.recibir_confirmacion("sí")
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert "salario" in respuesta2.texto.lower()
+
+
+async def test_pago_salario_operador_corrige_el_valor(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    await maquina.procesar_intencion(IntPagoSalario(intencion="pago_salario", mes="marzo", monto=1400000))
+    # En vez de "sí", el operador dicta otro valor.
+    respuesta = await maquina.recibir_confirmacion("1.600.000")
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert "1.600.000" in respuesta.texto
 
 
 async def test_recibo_excede_limite_de_aportes(api_client: ApiClient) -> None:

@@ -44,6 +44,9 @@ from coop_contracts.respuestas import (
     PatchNotificacionRequest,
     RetiroResponse,
     RetirosRequest,
+    SalarioConfig,
+    SalarioRequest,
+    SalarioResponse,
     SocioDetalle,
     SocioRef,
     SocioSearchItem,
@@ -270,6 +273,34 @@ def get_liquidacion_actual(letra_id: int, _auth: AuthDep = None) -> Response:
 
 
 # ── Caja ──────────────────────────────────────────────────────────────────────
+
+
+@app.get("/config/salario")
+def get_salario_config(_auth: AuthDep = None) -> SalarioConfig:
+    return SalarioConfig(salario_guardado=_state["caja"].get("salario_minimo", 1423500))
+
+
+@app.post("/operaciones/salario", status_code=201)
+def pagar_salario(
+    body: SalarioRequest,
+    _auth: AuthDep = None,
+    idem_key: IdempDep = None,
+) -> SalarioResponse:
+    payload_hash = hash(body.model_dump_json())
+    cached = _check_idempotency(idem_key, payload_hash)
+    if cached:
+        return SalarioResponse(**cached)
+    _state["caja"]["saldo_en_caja"] -= body.monto
+    _state["caja"]["salario_minimo"] = body.monto
+    resp = SalarioResponse(
+        recibo_id=_next_recibo(),
+        fecha=_today(),
+        mes=body.mes,
+        monto=body.monto,
+        saldo_caja_nuevo=_state["caja"]["saldo_en_caja"],
+    )
+    _store_idempotency(idem_key, payload_hash, resp.model_dump())
+    return resp
 
 
 @app.get("/caja")

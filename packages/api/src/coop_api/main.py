@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from coop_api.postgres_schema import CONFIG_DEFAULTS, MIGRATIONS_POSTGRES, SCHEMA_POSTGRES
 from coop_api.routers import (
     caja,
+    config,
     creditos,
     health,
     notificaciones,
@@ -45,6 +46,7 @@ app.include_router(creditos.router)
 app.include_router(operaciones.router)
 app.include_router(notificaciones.router)
 app.include_router(recibos_archivos.router)
+app.include_router(config.router)
 
 
 @app.exception_handler(Exception)

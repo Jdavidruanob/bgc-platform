@@ -119,6 +119,14 @@ class IntConsultarFamilia(BaseModel):
     socio: str
 
 
+class IntPagoSalario(BaseModel):
+    intencion: Literal["pago_salario"]
+    # Mes que se paga (en palabra). Null = el mes actual.
+    mes: str | None = None
+    # Monto si el operador lo dijo explícito. Null = usar el salario sugerido.
+    monto: Annotated[int, Field(gt=0)] | None = None
+
+
 class IntLiquidacionLetra(BaseModel):
     intencion: Literal["liquidacion_letra"]
     letras: list[int] = Field(..., min_length=1, description="Una o varias letras a liquidar")
@@ -162,6 +170,7 @@ Intencion = (
     | IntConsultarCreditos
     | IntConsultarFamilia
     | IntLiquidacionLetra
+    | IntPagoSalario
     | IntAyuda
     | IntDesconocida
     | IntIncompleta

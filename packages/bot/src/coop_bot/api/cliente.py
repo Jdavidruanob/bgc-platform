@@ -24,6 +24,9 @@ from coop_contracts.respuestas import (
     PatchNotificacionRequest,
     RetiroResponse,
     RetirosRequest,
+    SalarioConfig,
+    SalarioRequest,
+    SalarioResponse,
     SocioDetalle,
     SociosSearchResponse,
 )
@@ -145,6 +148,12 @@ class ApiClient:
 
     async def crear_credito(self, body: CrearCreditoRequest, idempotency_key: str) -> CrearCreditoResponse:
         return await self._post("/operaciones/creditos", body, idempotency_key, CrearCreditoResponse)
+
+    async def get_salario_config(self) -> SalarioConfig:
+        return await self._get("/config/salario", {}, SalarioConfig)
+
+    async def pagar_salario(self, body: SalarioRequest, idempotency_key: str) -> SalarioResponse:
+        return await self._post("/operaciones/salario", body, idempotency_key, SalarioResponse)
 
     # ── Test utilities ───────────────────────────────────────────────────────
 

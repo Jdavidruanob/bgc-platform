@@ -18,6 +18,8 @@ from coop_contracts.respuestas import (
     PagosResponse,
     RetiroResponse,
     RetirosRequest,
+    SalarioRequest,
+    SalarioResponse,
     SocioRef,
 )
 from coop_core.config.papeleria import PAPELERIA_POR_APORTE, count_cobrables
@@ -25,18 +27,20 @@ from coop_core.repositories.auxiliar_repo import AuxiliarRepository
 from coop_core.repositories.config_repo import ConfigRepository
 from coop_core.repositories.creditos_repo import CreditosRepository
 from coop_core.repositories.liquidaciones_repo import LiquidacionesRepository
+from coop_core.repositories.recibos_repo import RecibosRepository
 from coop_core.repositories.socios_repo import SociosRepository
 from coop_core.services.aporte_service import AporteService
 from coop_core.services.combinado_service import CombinadoService
 from coop_core.services.credito_service import CreditoService
 from coop_core.services.pago_service import PagoService
 from coop_core.services.retiro_service import RetiroService
+from coop_core.utils.fecha import get_hoy_str
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse
 
 import coop_api.idempotency as idem
 from coop_api.deps import AuthDep, DbDep
-from coop_api.errors import value_error_to_response
+from coop_api.errors import not_found, value_error_to_response
 from coop_api.recibos import wire as recibos_wire
 
 router = APIRouter(prefix="/operaciones", tags=["operaciones"])
@@ -423,5 +427,59 @@ def crear_credito(
     # de idempotencia se guardan en transacciones posteriores.
     recibos_wire.guardar_liquidacion_credito(db, resultado)
     idem.store(db, idem_key, "POST /operaciones/creditos", payload_json, resp.model_dump())
+    db.commit()
+    return resp
+
+
+@router.post("/salario", status_code=201, response_model=None)
+def pagar_salario(
+    body: SalarioRequest,
+    db: DbDep,
+    _auth: AuthDep,
+    idempotency_key: IdempDep = None,  # type: ignore[assignment]
+) -> SalarioResponse | JSONResponse:
+    idem_key = _require_idem(idempotency_key)
+    payload_json = body.model_dump_json()
+    try:
+        cached = idem.check(db, idem_key, "POST /operaciones/salario", payload_json)
+    except ValueError:
+        return value_error_to_response(ValueError("IDEMPOTENCY_CONFLICT"))
+    if cached:
+        return SalarioResponse.model_validate(cached)
+
+    config = ConfigRepository(db)
+    auxiliar = AuxiliarRepository(db)
+    recibos = RecibosRepository(db)
+
+    tesorero_id = config.get_int("tesorero_socio_id")
+    if SociosRepository(db).find_by_id(tesorero_id) is None:
+        return not_found("SOCIO_NO_ENCONTRADO", f"No existe el socio tesorero (ID {tesorero_id}).")
+
+    recibo_id = recibos.create(tesorero_id)
+    saldo_nuevo = config.get_int("saldo_en_caja") - body.monto
+    config.set("saldo_en_caja", str(saldo_nuevo))
+    # Guardar el salario confirmado para la próxima vez.
+    config.set("salario_minimo", str(body.monto))
+    fecha_str = get_hoy_str()
+    auxiliar.add(
+        fecha=fecha_str,
+        tipo="Pago Salario",
+        socio="Administracion",
+        recibo=recibo_id,
+        monto=-body.monto,
+        saldo=saldo_nuevo,
+        cuota=None,
+        id_credito=None,
+    )
+
+    resp = SalarioResponse(
+        recibo_id=recibo_id,
+        fecha=fecha_str,
+        mes=body.mes,
+        monto=body.monto,
+        saldo_caja_nuevo=saldo_nuevo,
+    )
+    recibos_wire.guardar_recibo_salario(db, recibo_id, fecha_str, body.mes, body.monto)
+    idem.store(db, idem_key, "POST /operaciones/salario", payload_json, resp.model_dump())
     db.commit()
     return resp

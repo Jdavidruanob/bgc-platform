@@ -149,4 +149,6 @@ CONFIG_DEFAULTS = {
     "saldo_en_caja": "0",
     "total_admin": "0",
     "porcentaje_mora": "0.02",
+    "salario_minimo": "1423500",
+    "tesorero_socio_id": "1",
 }

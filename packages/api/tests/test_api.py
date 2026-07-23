@@ -422,6 +422,35 @@ def test_crear_credito_capital_invalido(client: TestClient, socio_pedro):
     assert r.status_code == 422  # pydantic gt=0
 
 
+def test_get_salario_config(client: TestClient):
+    r = client.get("/config/salario", headers=AUTH)
+    assert r.status_code == 200
+    assert r.json()["salario_guardado"] > 0
+
+
+def test_pago_salario_descuenta_caja_y_guarda_valor(client: TestClient, socio_pedro, db_conn):
+    from coop_core.repositories.config_repo import ConfigRepository
+
+    # El tesorero por defecto es el socio 1; en el test usamos el socio del fixture.
+    cfg = ConfigRepository(db_conn)
+    cfg.set("tesorero_socio_id", str(socio_pedro))
+    cfg.set("saldo_en_caja", "5000000")
+    db_conn.commit()
+
+    r = client.post(
+        "/operaciones/salario",
+        json={"mes": "Junio", "monto": 1500000},
+        headers=_idem(),
+    )
+    assert r.status_code == 201
+    data = r.json()
+    assert data["mes"] == "Junio"
+    assert data["monto"] == 1500000
+    assert data["saldo_caja_nuevo"] == 5000000 - 1500000
+    # El valor confirmado queda guardado para la próxima
+    assert client.get("/config/salario", headers=AUTH).json()["salario_guardado"] == 1500000
+
+
 def test_crear_credito_sin_idempotency_key(client: TestClient, socio_pedro):
     r = client.post(
         "/operaciones/creditos",

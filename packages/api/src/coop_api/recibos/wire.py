@@ -22,6 +22,7 @@ from coop_api.recibos.generador import (
     CuotaLiquidacion,
     DatosLiquidacion,
     DatosRecibo,
+    DatosSalario,
     LineaAporte,
     LineaPago,
     SocioBasico,
@@ -97,6 +98,23 @@ def _persistir(db: DbConnection, recibo_id: int, tipo: TipoRecibo, xlsx: bytes) 
         logger.exception("Fallo al convertir xlsx a PDF para el recibo %s", recibo_id)
         raise
     RecibosArchivosRepository(db).guardar(recibo_id, tipo, xlsx, pdf)
+
+
+def guardar_recibo_salario(
+    db: DbConnection,
+    recibo_id: int,
+    fecha: str,
+    mes: str,
+    monto: int,
+) -> None:
+    datos = DatosSalario(
+        recibo_id=recibo_id,
+        valor=monto,
+        fecha=_a_date(fecha),
+        mes=mes,
+    )
+    xlsx = generador.generar_xlsx_salario(datos)
+    _persistir(db, recibo_id, "salario", xlsx)
 
 
 def guardar_recibo_aporte(

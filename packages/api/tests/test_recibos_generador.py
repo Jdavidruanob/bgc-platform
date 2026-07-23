@@ -12,6 +12,7 @@ from coop_api.recibos.generador import (
     CuotaLiquidacion,
     DatosLiquidacion,
     DatosRecibo,
+    DatosSalario,
     LineaAporte,
     LineaPago,
     SocioBasico,
@@ -20,6 +21,7 @@ from coop_api.recibos.generador import (
     generar_xlsx_liquidacion,
     generar_xlsx_pago,
     generar_xlsx_retiro,
+    generar_xlsx_salario,
 )
 from openpyxl import load_workbook
 
@@ -188,3 +190,12 @@ def test_liquidacion_llena_cabecera_y_tabla() -> None:
     assert ws["A15"].value == "2026-08-22"
     assert ws["B15"].value == "1"
     assert "12.000" in str(ws["D15"].value)
+
+
+def test_salario_llena_las_cuatro_celdas() -> None:
+    datos = DatosSalario(recibo_id=77, valor=1500000, fecha=date(2026, 6, 15), mes="Junio")
+    ws = _abrir(generar_xlsx_salario(datos))
+    assert ws["B4"].value == 77
+    assert "1.500.000" in str(ws["G4"].value)
+    assert ws["D6"].value == "15/06/2026"
+    assert ws["C12"].value == "Junio"

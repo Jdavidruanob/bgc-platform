@@ -371,3 +371,27 @@ def generar_xlsx_liquidacion(datos: DatosLiquidacion) -> bytes:
     celda_firma.font = Font(bold=True, size=12)
 
     return _guardar(wb)
+
+
+# ── Recibo de salario ─────────────────────────────────────────────────────────
+
+
+@dataclass
+class DatosSalario:
+    recibo_id: int
+    valor: int
+    fecha: date
+    mes: str  # en palabra, p.ej. "Junio"
+
+
+def generar_xlsx_salario(datos: DatosSalario) -> bytes:
+    """Llena la plantilla de salario. Solo cuatro celdas (las combinadas se
+    llenan desde su celda superior-izquierda):
+      B4 = número de recibo · G4 = valor · D6 = fecha · C12 = mes."""
+    wb = _abrir_plantilla("recibo_template_salario.xlsx")
+    ws = wb.active
+    ws["B4"] = datos.recibo_id
+    ws["G4"] = format_miles_colombian_int(datos.valor)
+    ws["D6"] = datos.fecha.strftime("%d/%m/%Y")
+    ws["C12"] = datos.mes
+    return _guardar(wb)

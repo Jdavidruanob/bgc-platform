@@ -30,6 +30,7 @@ from coop_contracts.intenciones import (
     IntIncompleta,
     IntLiquidacionLetra,
     IntListarSocios,
+    IntPagoSalario,
     IntRegAporte,
     IntRegCombinado,
     IntRegPago,
@@ -45,6 +46,7 @@ from coop_contracts.respuestas import (
     PagoReqItem,
     PagosRequest,
     RetirosRequest,
+    SalarioRequest,
     SocioSearchItem,
 )
 
@@ -70,6 +72,7 @@ from coop_bot.pdf.generador import (
     recibo_desde_pagos,
     recibo_desde_retiro,
 )
+from coop_bot.salario_web import consultar_salario_minimo_web
 
 TIMEOUT_SEGUNDOS = 300  # 5 minutos
 
@@ -110,6 +113,8 @@ class SesionDialogo:
     texto_acumulado: str | None = None
     # Plan resuelto de aportes/pagos (registrar_aporte/pago/combinado).
     plan: PlanRecibo | None = None
+    # Pago de salario pendiente de confirmar (mes + monto sugerido).
+    salario_pendiente: SalarioPendiente | None = None
     actualizado_en: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -157,6 +162,12 @@ class PlanRecibo:
         return bool(self.aportes) and bool(self.pagos)
 
 
+@dataclass
+class SalarioPendiente:
+    mes: str
+    monto: int
+
+
 class MaquinaEstados:
     def __init__(self, sesion: SesionDialogo, cliente: ApiClient) -> None:
         self.sesion = sesion
@@ -181,6 +192,10 @@ class MaquinaEstados:
         if isinstance(intencion, IntAyuda):
             self.sesion.texto_acumulado = None
             return self._quedarse_en_espera(texto_ayuda(intencion.tema))
+        if isinstance(intencion, IntPagoSalario):
+            self.sesion.texto_acumulado = None
+            self.sesion.intencion = intencion
+            return await self._preparar_salario(intencion)
         if not isinstance(
             intencion,
             IntRegAporte
@@ -218,6 +233,35 @@ class MaquinaEstados:
     async def recibir_confirmacion(self, texto: str) -> RespuestaDialogo:
         if _es_negacion(texto):
             return self._cancelar("Operación cancelada. No se guardó nada.")
+
+        # Salario: además de sí/no, se acepta un monto nuevo ("1.500.000").
+        if self.sesion.salario_pendiente is not None:
+            nuevo_monto = _parsear_monto(texto)
+            if nuevo_monto is not None:
+                self.sesion.salario_pendiente.monto = nuevo_monto
+            elif not _es_afirmacion(texto):
+                return RespuestaDialogo(
+                    texto="No entendí. Responde «sí» para confirmar, o dime el valor del salario.",
+                    requiere_timeout=True,
+                )
+            self.sesion.estado = EstadoDialogo.EJECUTANDO
+            if self.sesion.idempotency_key is None:
+                self.sesion.idempotency_key = str(uuid4())
+            try:
+                texto_ok, pdf_bytes, nombre_pdf = await self._ejecutar_salario()
+            except ApiError as exc:
+                self._reset_operacion()
+                self.sesion.estado = EstadoDialogo.ESPERANDO_MENSAJE
+                return RespuestaDialogo(texto=exc.mensaje, cancelar_timeout=True)
+            self._reset_operacion()
+            self.sesion.estado = EstadoDialogo.ESPERANDO_MENSAJE
+            return RespuestaDialogo(
+                texto=texto_ok,
+                documento_pdf=pdf_bytes,
+                nombre_documento=nombre_pdf,
+                cancelar_timeout=True,
+            )
+
         if not _es_afirmacion(texto):
             return RespuestaDialogo(
                 texto=f"No entendí tu respuesta. {PROMPT_CONFIRMACION}",
@@ -665,6 +709,42 @@ class MaquinaEstados:
         nombre_pdf = f"Liquidacion_letra_{resp.letra_id}.pdf" if pdf_bytes is not None else None
         return texto, pdf_bytes, nombre_pdf
 
+    # ── Salario ──────────────────────────────────────────────────────────────
+
+    async def _preparar_salario(self, intencion: IntPagoSalario) -> RespuestaDialogo:
+        mes = (intencion.mes or _mes_actual()).capitalize()
+        if intencion.monto is not None:
+            monto, fuente = intencion.monto, "el que me diste"
+        else:
+            web = await consultar_salario_minimo_web()
+            guardado = (await self.cliente.get_salario_config()).salario_guardado
+            if web is not None:
+                monto, fuente = web, "según la web"
+            else:
+                monto, fuente = guardado, "valor guardado"
+
+        self.sesion.salario_pendiente = SalarioPendiente(mes=mes, monto=monto)
+        self.sesion.estado = EstadoDialogo.ESPERANDO_CONFIRMACION
+        texto = (
+            f"Pago de salario de {mes}: {formatear_monto(monto)} ({fuente}).\n"
+            "¿Confirmo el pago? Responde «sí», o dime otro valor."
+        )
+        return RespuestaDialogo(texto=texto, requiere_timeout=True)
+
+    async def _ejecutar_salario(self) -> tuple[str, bytes | None, str | None]:
+        pendiente = self.sesion.salario_pendiente
+        key = self.sesion.idempotency_key
+        assert pendiente is not None
+        assert key is not None
+        resp = await self.cliente.pagar_salario(SalarioRequest(mes=pendiente.mes, monto=pendiente.monto), key)
+        texto = (
+            f"Listo, pago de salario de {resp.mes} por {formatear_monto(resp.monto)}.\n"
+            f"Saldo en caja: {formatear_monto(resp.saldo_caja_nuevo)}"
+        )
+        pdf_bytes = await self.cliente.descargar_pdf_recibo(resp.recibo_id)
+        nombre_pdf = f"Salario_{resp.mes}_{resp.recibo_id}.pdf" if pdf_bytes is not None else None
+        return texto, pdf_bytes, nombre_pdf
+
     # ── Helpers de estado ─────────────────────────────────────────────────────
 
     def _quedarse_en_espera(self, texto: str) -> RespuestaDialogo:
@@ -685,6 +765,7 @@ class MaquinaEstados:
         self.sesion.resumen_texto = None
         self.sesion.texto_acumulado = None
         self.sesion.plan = None
+        self.sesion.salario_pendiente = None
 
 
 # ── Helpers de módulo ──────────────────────────────────────────────────────────
@@ -743,6 +824,36 @@ def _nombres_letras(intencion: Intencion) -> list[tuple[str, str | None]]:
 def _parsear_letra(hint: str) -> int | None:
     texto = hint.strip().lstrip("#").removeprefix("letra").strip()
     return int(texto) if texto.isdigit() else None
+
+
+_MESES_ES = [
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
+]
+
+
+def _mes_actual() -> str:
+    return _MESES_ES[datetime.now(UTC).month - 1]
+
+
+def _parsear_monto(texto: str) -> int | None:
+    """Extrae un monto en pesos de un texto como '1.500.000' o '1500000'.
+    None si no parece un monto (deja pasar 'sí'/'no' al flujo normal)."""
+    limpio = texto.strip().lower().replace("$", "").replace(".", "").replace(",", "").replace(" ", "")
+    if limpio.isdigit():
+        valor = int(limpio)
+        return valor if valor > 0 else None
+    return None
 
 
 def _mensaje_limite(n_aportes: int, n_pagos: int) -> str:
