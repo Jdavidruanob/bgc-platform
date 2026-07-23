@@ -16,6 +16,7 @@ from coop_contracts.respuestas import (
     CrearCreditoResponse,
     CreditosResponse,
     CuotasPendientesResponse,
+    FamiliaResponse,
     NotificacionesPendientesResponse,
     PagosRequest,
     PagosResponse,
@@ -92,6 +93,9 @@ class ApiClient:
 
     async def listar_socios(self) -> SociosSearchResponse:
         return await self._get("/socios/lista", {}, SociosSearchResponse)
+
+    async def get_familia(self, socio_id: int) -> FamiliaResponse:
+        return await self._get(f"/socios/{socio_id}/familia", {}, FamiliaResponse)
 
     async def get_socio(self, socio_id: int) -> SocioDetalle:
         return await self._get(f"/socios/{socio_id}", {}, SocioDetalle)

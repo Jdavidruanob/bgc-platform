@@ -31,7 +31,9 @@ from coop_contracts.respuestas import (
     CuotasPendientesResponse,
     ErrorDetail,
     ErrorResponse,
+    FamiliaResponse,
     HealthOk,
+    MiembroFamilia,
     NotificacionesPendientesResponse,
     NotificacionPendiente,
     PagoResultItem,
@@ -193,6 +195,21 @@ def get_socio(socio_id: int, _auth: AuthDep = None) -> SocioDetalle:
         saldo=s["saldo"],
         creditos_activos=s["creditos_activos"],
     )
+
+
+@app.get("/socios/{socio_id}/familia")
+def get_familia(socio_id: int, _auth: AuthDep = None) -> FamiliaResponse:
+    socio = _find_socio(socio_id)
+    familia_id = socio.get("familia_id")
+    if familia_id is None:
+        miembros_raw = [socio]
+    else:
+        miembros_raw = [s for s in _state["socios"] if s.get("familia_id") == familia_id]
+    miembros = [
+        MiembroFamilia(id=s["id"], nombre_completo=make_nombre_completo(s), saldo=s["saldo"])
+        for s in miembros_raw
+    ]
+    return FamiliaResponse(socio_id=socio_id, miembros=miembros)
 
 
 @app.get("/socios/{socio_id}/creditos")

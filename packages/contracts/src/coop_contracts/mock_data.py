@@ -13,6 +13,7 @@ SOCIOS_INICIALES: list[dict] = [
         "whatsapp_e164": "+573001234567",
         "saldo": 320000,
         "creditos_activos": 1,
+        "familia_id": 1,
     },
     {
         "id": 2,
@@ -31,6 +32,7 @@ SOCIOS_INICIALES: list[dict] = [
         "whatsapp_e164": "+573112223344",
         "saldo": 250000,
         "creditos_activos": 0,
+        "familia_id": 1,
     },
     {
         "id": 4,

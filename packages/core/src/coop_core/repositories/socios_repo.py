@@ -7,6 +7,28 @@ class SociosRepository:
     def __init__(self, conn: DbConnection) -> None:
         self._conn = conn
 
+    def find_familia_de(self, socio_id: int) -> list[dict[str, Any]]:
+        """Miembros de la familia del socio (incluye al socio). Si el socio no
+        tiene familia asignada, devuelve solo al socio."""
+        cursor = self._conn.cursor()
+        cursor.execute("SELECT familia_id FROM socios WHERE id = %s", (socio_id,))
+        row = cursor.fetchone()
+        if row is None:
+            return []
+        familia_id = row[0]
+        if familia_id is None:
+            cursor.execute(
+                "SELECT id, nombres, apellidos, saldo FROM socios WHERE id = %s",
+                (socio_id,),
+            )
+        else:
+            cursor.execute(
+                "SELECT id, nombres, apellidos, saldo FROM socios WHERE familia_id = %s ORDER BY id",
+                (familia_id,),
+            )
+        cols = [d[0] for d in cursor.description]
+        return [dict(zip(cols, r, strict=False)) for r in cursor.fetchall()]
+
     def find_all(self) -> list[dict[str, Any]]:
         cursor = self._conn.cursor()
         cursor.execute("""

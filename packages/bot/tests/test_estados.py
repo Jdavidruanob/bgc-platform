@@ -6,6 +6,7 @@ from coop_contracts.intenciones import (
     IntConsultarCaja,
     IntConsultarCreditos,
     IntConsultarCuotas,
+    IntConsultarFamilia,
     IntConsultarSocio,
     IntCrearCredito,
     IntDesconocida,
@@ -147,8 +148,8 @@ async def test_consultar_cuotas_con_letra_hint(api_client: ApiClient) -> None:
     assert "Hernando Ruiz Vargas" in respuesta.texto
     assert "Letra 451" in respuesta.texto
     assert "Cuotas pendientes: 1" in respuesta.texto
-    assert respuesta.documento_pdf is not None
-    assert respuesta.nombre_documento == "cuotas_letra_451.pdf"
+    assert len(respuesta.documentos) == 1
+    assert respuesta.documentos[0][0] == "cuotas_letra_451.pdf"
 
 
 async def test_consultar_cuotas_socio_sin_creditos(api_client: ApiClient) -> None:
@@ -180,21 +181,53 @@ async def test_consultar_creditos_de_un_socio(api_client: ApiClient) -> None:
     assert "cuotas" in respuesta.texto.lower()
 
 
+async def test_consultar_familia_lista_miembros_y_saldos(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    respuesta = await maquina.procesar_intencion(
+        IntConsultarFamilia(intencion="consultar_familia", socio="Pedro Antonio Gómez Ruiz")
+    )
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert "Familia de" in respuesta.texto
+    assert "María López Herrera" in respuesta.texto  # mismo familia_id en el mock
+    assert "Saldo total" in respuesta.texto
+
+
+async def test_consultar_familia_socio_sin_familia(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    respuesta = await maquina.procesar_intencion(
+        IntConsultarFamilia(intencion="consultar_familia", socio="Carmenza Suárez Peña")
+    )
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert "no tiene familia registrada" in respuesta.texto
+
+
 async def test_liquidacion_letra_devuelve_pdf(api_client: ApiClient) -> None:
     maquina = _maquina(api_client)
     respuesta = await maquina.procesar_intencion(
-        IntLiquidacionLetra(intencion="liquidacion_letra", letra_id=450)
+        IntLiquidacionLetra(intencion="liquidacion_letra", letras=[450])
     )
     assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
     assert "450" in respuesta.texto
-    assert respuesta.documento_pdf is not None
-    assert respuesta.nombre_documento == "Liquidacion_actual_letra_450.pdf"
+    assert len(respuesta.documentos) == 1
+    assert respuesta.documentos[0][0] == "Liquidacion_actual_letra_450.pdf"
+
+
+async def test_liquidacion_varias_letras_devuelve_varios_pdf(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    respuesta = await maquina.procesar_intencion(
+        IntLiquidacionLetra(intencion="liquidacion_letra", letras=[450, 451])
+    )
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert len(respuesta.documentos) == 2
+    nombres = [n for n, _ in respuesta.documentos]
+    assert "Liquidacion_actual_letra_450.pdf" in nombres
+    assert "Liquidacion_actual_letra_451.pdf" in nombres
 
 
 async def test_liquidacion_letra_inexistente(api_client: ApiClient) -> None:
     maquina = _maquina(api_client)
     respuesta = await maquina.procesar_intencion(
-        IntLiquidacionLetra(intencion="liquidacion_letra", letra_id=9999)
+        IntLiquidacionLetra(intencion="liquidacion_letra", letras=[9999])
     )
     assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
     assert "no encontré" in respuesta.texto.lower()

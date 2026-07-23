@@ -93,9 +93,14 @@ class IntConsultarCreditos(BaseModel):
     socio: str
 
 
+class IntConsultarFamilia(BaseModel):
+    intencion: Literal["consultar_familia"]
+    socio: str
+
+
 class IntLiquidacionLetra(BaseModel):
     intencion: Literal["liquidacion_letra"]
-    letra_id: int
+    letras: list[int] = Field(..., min_length=1, description="Una o varias letras a liquidar")
 
 
 class IntPagoTodasLetras(BaseModel):
@@ -140,6 +145,7 @@ Intencion = (
     | IntConsultarCaja
     | IntListarSocios
     | IntConsultarCreditos
+    | IntConsultarFamilia
     | IntLiquidacionLetra
     | IntPagoTodasLetras
     | IntAyuda

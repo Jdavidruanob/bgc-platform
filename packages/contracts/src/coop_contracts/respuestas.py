@@ -70,6 +70,17 @@ class SociosSearchResponse(BaseModel):
     socios: list[SocioSearchItem]
 
 
+class MiembroFamilia(BaseModel):
+    id: int
+    nombre_completo: str
+    saldo: int
+
+
+class FamiliaResponse(BaseModel):
+    socio_id: int
+    miembros: list[MiembroFamilia]
+
+
 class SocioDetalle(BaseModel):
     id: int
     nombres: str

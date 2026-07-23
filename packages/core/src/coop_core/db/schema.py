@@ -4,6 +4,11 @@ No usa DATE('now'), sqlite_sequence ni INSERT OR IGNORE.
 """
 
 SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS familias (
+    id INTEGER PRIMARY KEY,
+    nombre TEXT
+);
+
 CREATE TABLE IF NOT EXISTS socios (
     id INTEGER PRIMARY KEY,
     cc TEXT,
@@ -13,6 +18,7 @@ CREATE TABLE IF NOT EXISTS socios (
     celular TEXT,
     photo_path TEXT,
     foto BLOB,
+    familia_id INTEGER,
     whatsapp_e164 TEXT,
     optin_whatsapp_fecha TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

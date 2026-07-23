@@ -132,11 +132,24 @@ Cuando el operador pregunta qué créditos/letras tiene un socio.
 
 Ejemplos: "¿Qué créditos tiene Pedro Gómez?", "¿Qué letras tiene María?", "Los créditos de Hernando".
 
-### liquidacion_letra
-Cuando el operador pide la liquidación (estado actual) de una letra específica. La letra es un número único, basta con ese número.
-{"intencion": "liquidacion_letra", "letra_id": <entero>}
+### consultar_familia
+En la cooperativa cada socio pertenece por lo general a una FAMILIA (un grupo de socios). Usa esta intención cuando el operador pregunta por la familia de un socio, o pide el saldo de la familia de alguien.
+{"intencion": "consultar_familia", "socio": "<nombre>"}
 
-Ejemplos: "Dame la liquidación de la letra 450", "¿Cómo va la letra 320?", "Liquidación actual de la 451", "Estado de la letra 450".
+Ejemplos:
+"¿Cuál es la familia de Harvey?" -> {"intencion": "consultar_familia", "socio": "Harvey"}
+"Dame el saldo de la familia de Harvey" -> {"intencion": "consultar_familia", "socio": "Harvey"}
+"¿Quiénes son la familia de Magaly?" -> {"intencion": "consultar_familia", "socio": "Magaly"}
+
+### liquidacion_letra
+Cuando el operador pide la liquidación (estado actual) de una o varias letras. La letra es un número único, basta con el número. El campo "letras" es SIEMPRE una lista, aunque sea una sola letra.
+{"intencion": "liquidacion_letra", "letras": [<entero>, ...]}
+
+Ejemplos:
+"Dame la liquidación de la letra 450" -> {"intencion": "liquidacion_letra", "letras": [450]}
+"¿Cómo va la letra 320?" -> {"intencion": "liquidacion_letra", "letras": [320]}
+"Dame las liquidaciones de las letras 413 y 444" -> {"intencion": "liquidacion_letra", "letras": [413, 444]}
+"Liquidación de la 350, la 415 y la 444" -> {"intencion": "liquidacion_letra", "letras": [350, 415, 444]}
 
 ## Intención de ayuda (el operador pregunta qué puede hacer o cómo se hace algo)
 

@@ -213,6 +213,8 @@ async def _responder(context: ContextTypes.DEFAULT_TYPE, chat_id: int, respuesta
     await enviar_texto(context, chat_id, respuesta.texto)
     if respuesta.documento_pdf is not None and respuesta.nombre_documento is not None:
         await enviar_pdf(context, chat_id, respuesta.documento_pdf, respuesta.nombre_documento)
+    for nombre, contenido in respuesta.documentos:
+        await enviar_pdf(context, chat_id, contenido, nombre)
     if respuesta.cancelar_timeout:
         _cancelar_timeout(context, chat_id)
     if respuesta.requiere_timeout:

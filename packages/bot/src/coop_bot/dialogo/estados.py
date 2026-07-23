@@ -21,6 +21,7 @@ from coop_contracts.intenciones import (
     IntConsultarCaja,
     IntConsultarCreditos,
     IntConsultarCuotas,
+    IntConsultarFamilia,
     IntConsultarSocio,
     IntCrearCredito,
     IntDesconocida,
@@ -115,6 +116,9 @@ class RespuestaDialogo:
     cancelar_timeout: bool = False
     documento_pdf: bytes | None = None
     nombre_documento: str | None = None
+    # Documentos adicionales (nombre, bytes) para respuestas con varios PDFs,
+    # p. ej. las liquidaciones de varias letras a la vez.
+    documentos: list[tuple[str, bytes]] = field(default_factory=list)
 
 
 class MaquinaEstados:
@@ -154,6 +158,7 @@ class MaquinaEstados:
             | IntConsultarCaja
             | IntListarSocios
             | IntConsultarCreditos
+            | IntConsultarFamilia
             | IntLiquidacionLetra,
         ):
             self.sesion.texto_acumulado = None
@@ -280,6 +285,7 @@ class MaquinaEstados:
             | IntConsultarCaja
             | IntListarSocios
             | IntConsultarCreditos
+            | IntConsultarFamilia
             | IntLiquidacionLetra,
         ):
             return await self._ejecutar_consulta()
@@ -346,21 +352,26 @@ class MaquinaEstados:
     async def _ejecutar_consulta(self) -> RespuestaDialogo:
         intencion = self.sesion.intencion
         assert intencion is not None
+        documentos: list[tuple[str, bytes]] = []
 
         try:
             if isinstance(intencion, IntConsultarCaja):
-                texto, pdf_bytes, nombre_pdf = await self._consultar_caja(), None, None
+                texto = await self._consultar_caja()
             elif isinstance(intencion, IntConsultarSocio):
-                texto, pdf_bytes, nombre_pdf = await self._consultar_socio(intencion), None, None
+                texto = await self._consultar_socio(intencion)
             elif isinstance(intencion, IntListarSocios):
-                texto, pdf_bytes, nombre_pdf = await self._listar_socios(), None, None
+                texto = await self._listar_socios()
             elif isinstance(intencion, IntConsultarCreditos):
-                texto, pdf_bytes, nombre_pdf = await self._consultar_creditos(intencion), None, None
+                texto = await self._consultar_creditos(intencion)
+            elif isinstance(intencion, IntConsultarFamilia):
+                texto = await self._consultar_familia(intencion)
             elif isinstance(intencion, IntLiquidacionLetra):
-                texto, pdf_bytes, nombre_pdf = await self._liquidacion_letra(intencion)
+                texto, documentos = await self._liquidacion_letras(intencion)
             else:
                 assert isinstance(intencion, IntConsultarCuotas)
                 texto, pdf_bytes, nombre_pdf = await self._consultar_cuotas(intencion)
+                if pdf_bytes is not None and nombre_pdf is not None:
+                    documentos.append((nombre_pdf, pdf_bytes))
         except ApiError as exc:
             self._reset_operacion()
             self.sesion.estado = EstadoDialogo.ESPERANDO_MENSAJE
@@ -368,12 +379,7 @@ class MaquinaEstados:
 
         self._reset_operacion()
         self.sesion.estado = EstadoDialogo.ESPERANDO_MENSAJE
-        return RespuestaDialogo(
-            texto=texto,
-            documento_pdf=pdf_bytes,
-            nombre_documento=nombre_pdf,
-            cancelar_timeout=True,
-        )
+        return RespuestaDialogo(texto=texto, documentos=documentos, cancelar_timeout=True)
 
     async def _consultar_caja(self) -> str:
         caja = await self.cliente.get_caja()
@@ -414,17 +420,48 @@ class MaquinaEstados:
             )
         return "\n".join(lineas)
 
-    async def _liquidacion_letra(
+    async def _consultar_familia(self, intencion: IntConsultarFamilia) -> str:
+        resuelto = self.sesion.socios[intencion.socio]
+        resp = await self.cliente.get_familia(resuelto.id)
+        if len(resp.miembros) <= 1:
+            return f"{resuelto.nombre_completo} no tiene familia registrada (solo aparece él/ella)."
+        total = sum(m.saldo for m in resp.miembros)
+        lineas = [f"Familia de {resuelto.nombre_completo} ({len(resp.miembros)} socios):"]
+        for m in resp.miembros:
+            lineas.append(f"• {m.nombre_completo}: {formatear_monto(m.saldo)}")
+        lineas.append(f"Saldo total de la familia: {formatear_monto(total)}")
+        return "\n".join(lineas)
+
+    async def _liquidacion_letras(
         self, intencion: IntLiquidacionLetra
-    ) -> tuple[str, bytes | None, str | None]:
-        pdf_bytes = await self.cliente.descargar_pdf_liquidacion_actual(intencion.letra_id)
-        if pdf_bytes is None:
-            return (f"No encontré un crédito con la letra {intencion.letra_id}.", None, None)
-        return (
-            f"Aquí está la liquidación actual de la letra {intencion.letra_id}.",
-            pdf_bytes,
-            f"Liquidacion_actual_letra_{intencion.letra_id}.pdf",
-        )
+    ) -> tuple[str, list[tuple[str, bytes]]]:
+        documentos: list[tuple[str, bytes]] = []
+        encontradas: list[int] = []
+        no_encontradas: list[int] = []
+        for letra in intencion.letras:
+            pdf_bytes = await self.cliente.descargar_pdf_liquidacion_actual(letra)
+            if pdf_bytes is None:
+                no_encontradas.append(letra)
+            else:
+                documentos.append((f"Liquidacion_actual_letra_{letra}.pdf", pdf_bytes))
+                encontradas.append(letra)
+
+        if encontradas and not no_encontradas:
+            if len(encontradas) == 1:
+                texto = f"Aquí está la liquidación actual de la letra {encontradas[0]}."
+            else:
+                lista = ", ".join(str(letra) for letra in encontradas)
+                texto = f"Aquí están las liquidaciones actuales de las letras {lista}."
+        elif encontradas and no_encontradas:
+            ok = ", ".join(str(letra) for letra in encontradas)
+            faltan = ", ".join(str(letra) for letra in no_encontradas)
+            texto = f"Aquí están las liquidaciones de las letras {ok}. No encontré crédito para: {faltan}."
+        elif len(no_encontradas) == 1:
+            texto = f"No encontré un crédito con la letra {no_encontradas[0]}."
+        else:
+            faltan = ", ".join(str(letra) for letra in no_encontradas)
+            texto = f"No encontré créditos con esas letras: {faltan}."
+        return texto, documentos
 
     async def _consultar_cuotas(self, intencion: IntConsultarCuotas) -> tuple[str, bytes | None, str | None]:
         nombre_socio = self.sesion.socios[intencion.socio].nombre_completo
@@ -594,7 +631,11 @@ def _nombres_socios(intencion: Intencion) -> list[str]:
         nombres += list(intencion.socios)
     elif isinstance(
         intencion,
-        IntConsultarSocio | IntConsultarCuotas | IntConsultarCreditos | IntPagoTodasLetras,
+        IntConsultarSocio
+        | IntConsultarCuotas
+        | IntConsultarCreditos
+        | IntConsultarFamilia
+        | IntPagoTodasLetras,
     ):
         nombres.append(intencion.socio)
     return list(dict.fromkeys(nombres))

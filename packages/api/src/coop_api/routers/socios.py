@@ -1,6 +1,8 @@
 from coop_contracts.respuestas import (
     CreditoResumen,
     CreditosResponse,
+    FamiliaResponse,
+    MiembroFamilia,
     SocioDetalle,
     SocioSearchItem,
     SociosSearchResponse,
@@ -104,3 +106,20 @@ def get_creditos(socio_id: int, db: DbDep, _auth: AuthDep) -> CreditosResponse |
             )
         )
     return CreditosResponse(creditos=creditos)
+
+
+@router.get("/{socio_id}/familia", response_model=None)
+def get_familia(socio_id: int, db: DbDep, _auth: AuthDep) -> FamiliaResponse | JSONResponse:
+    socios_repo = SociosRepository(db)
+    if socios_repo.find_by_id(socio_id) is None:
+        return not_found("SOCIO_NO_ENCONTRADO", f"No existe un socio con ID {socio_id}.")
+    miembros_raw = socios_repo.find_familia_de(socio_id)
+    miembros = [
+        MiembroFamilia(
+            id=int(m["id"]),
+            nombre_completo=f"{m['nombres']} {m['apellidos']}",
+            saldo=int(m["saldo"]),
+        )
+        for m in miembros_raw
+    ]
+    return FamiliaResponse(socio_id=socio_id, miembros=miembros)

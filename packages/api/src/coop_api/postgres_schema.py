@@ -6,6 +6,11 @@ Este archivo solo se ejecuta en el lifespan de la API real; nunca en tests.
 """
 
 SCHEMA_POSTGRES = """
+CREATE TABLE IF NOT EXISTS familias (
+    id      INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    nombre  TEXT
+);
+
 CREATE TABLE IF NOT EXISTS socios (
     id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     cc          TEXT,
@@ -15,6 +20,7 @@ CREATE TABLE IF NOT EXISTS socios (
     celular     TEXT,
     photo_path  TEXT,
     foto        BYTEA,
+    familia_id  INTEGER,
     whatsapp_e164       TEXT,
     optin_whatsapp_fecha TEXT,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -143,4 +149,5 @@ CONFIG_DEFAULTS = {
 # aquí como ALTER ... IF NOT EXISTS y se ejecutan en el lifespan.
 MIGRATIONS_POSTGRES: tuple[str, ...] = (
     "ALTER TABLE socios ADD COLUMN IF NOT EXISTS foto BYTEA",
+    "ALTER TABLE socios ADD COLUMN IF NOT EXISTS familia_id INTEGER",
 )
