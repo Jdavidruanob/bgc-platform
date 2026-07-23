@@ -378,9 +378,11 @@ class MaquinaEstados:
     async def _consultar_caja(self) -> str:
         caja = await self.cliente.get_caja()
         return (
-            f"Saldo en caja: {formatear_monto(caja.saldo_en_caja)}\n"
-            f"Fondo administrativo: {formatear_monto(caja.total_admin)}\n"
-            f"Mora: {caja.porcentaje_mora:.1%}"
+            f"💰 Saldo en caja: {formatear_monto(caja.saldo_en_caja)}\n\n"
+            f"Administración total: {formatear_monto(caja.administracion_total)}\n"
+            f"  • Papelería: {formatear_monto(caja.papeleria)}\n"
+            f"  • Por mora: {formatear_monto(caja.mora_acumulada)}\n\n"
+            f"Tasa de mora: {caja.porcentaje_mora:.1%}"
         )
 
     async def _consultar_socio(self, intencion: IntConsultarSocio) -> str:

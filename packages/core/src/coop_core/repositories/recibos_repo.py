@@ -24,3 +24,11 @@ class RecibosRepository:
             return None
         cols = [d[0] for d in cursor.description]
         return dict(zip(cols, row, strict=False))
+
+    def sum_abono_mora(self) -> int:
+        """Mora acumulada históricamente: suma de todos los abonos por mora
+        registrados en los recibos. Igual que el BGC-software original."""
+        cursor = self._conn.cursor()
+        cursor.execute("SELECT COALESCE(SUM(abono_mora), 0) FROM detalle_recibo")
+        row = cursor.fetchone()
+        return int(row[0]) if row else 0

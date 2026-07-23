@@ -110,8 +110,11 @@ class CuotasPendientesResponse(BaseModel):
 
 class CajaEstado(BaseModel):
     saldo_en_caja: int
-    total_admin: int
+    total_admin: int  # alias histórico = papelería (compatibilidad)
     porcentaje_mora: float
+    papeleria: int = 0
+    mora_acumulada: int = 0
+    administracion_total: int = 0
 
 
 # ── Respuestas de operación ───────────────────────────────────────────────────

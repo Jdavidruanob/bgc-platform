@@ -131,6 +131,15 @@ def test_get_caja(client: TestClient):
     assert data["porcentaje_mora"] == 0.02
 
 
+def test_get_caja_desglosa_administracion(client: TestClient):
+    r = client.get("/caja", headers=AUTH)
+    data = r.json()
+    # Administración = papelería + mora acumulada
+    assert data["administracion_total"] == data["papeleria"] + data["mora_acumulada"]
+    # Sin operaciones, la mora acumulada es 0
+    assert data["mora_acumulada"] == 0
+
+
 # ── Créditos / cuotas ─────────────────────────────────────────────────────────
 
 

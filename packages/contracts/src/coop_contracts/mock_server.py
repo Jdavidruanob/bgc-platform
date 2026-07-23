@@ -238,7 +238,17 @@ def get_liquidacion_actual(letra_id: int, _auth: AuthDep = None) -> Response:
 
 @app.get("/caja")
 def get_caja(_auth: AuthDep = None) -> CajaEstado:
-    return CajaEstado(**_state["caja"])
+    caja = _state["caja"]
+    papeleria = caja["total_admin"]
+    mora_acumulada = caja.get("mora_acumulada", 0)
+    return CajaEstado(
+        saldo_en_caja=caja["saldo_en_caja"],
+        total_admin=papeleria,
+        porcentaje_mora=caja["porcentaje_mora"],
+        papeleria=papeleria,
+        mora_acumulada=mora_acumulada,
+        administracion_total=papeleria + mora_acumulada,
+    )
 
 
 # ── Operaciones ───────────────────────────────────────────────────────────────

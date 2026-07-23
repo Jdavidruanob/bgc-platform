@@ -104,6 +104,9 @@ async def test_consultar_caja(api_client: ApiClient) -> None:
 
     assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
     assert "$5.830.000" in respuesta.texto
+    assert "Administración total" in respuesta.texto
+    assert "Papelería" in respuesta.texto
+    assert "Por mora" in respuesta.texto
     assert respuesta.cancelar_timeout is True
     assert maquina.sesion.intencion is None
 
