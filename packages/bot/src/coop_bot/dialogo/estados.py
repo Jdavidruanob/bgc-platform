@@ -19,12 +19,16 @@ from coop_contracts.intenciones import (
     IntAmbigua,
     IntAyuda,
     IntConsultarCaja,
+    IntConsultarCreditos,
     IntConsultarCuotas,
     IntConsultarSocio,
     IntCrearCredito,
     IntDesconocida,
     Intencion,
     IntIncompleta,
+    IntLiquidacionLetra,
+    IntListarSocios,
+    IntPagoTodasLetras,
     IntRegAporte,
     IntRegCombinado,
     IntRegPago,
@@ -99,6 +103,8 @@ class SesionDialogo:
     idempotency_key: str | None = None
     resumen_texto: str | None = None
     texto_acumulado: str | None = None
+    # Créditos del socio para "pagar N cuotas a todas las letras".
+    creditos_todas_letras: list[CreditoResumen] = field(default_factory=list)
     actualizado_en: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -142,9 +148,13 @@ class MaquinaEstados:
             | IntRegPago
             | IntRegCombinado
             | IntCrearCredito
+            | IntPagoTodasLetras
             | IntConsultarSocio
             | IntConsultarCuotas
-            | IntConsultarCaja,
+            | IntConsultarCaja
+            | IntListarSocios
+            | IntConsultarCreditos
+            | IntLiquidacionLetra,
         ):
             self.sesion.texto_acumulado = None
             return self._quedarse_en_espera("No pude procesar esa solicitud.")
@@ -263,9 +273,37 @@ class MaquinaEstados:
             assert resolucion_letra.letra_id is not None
             self.sesion.letras[nombre] = resolucion_letra.letra_id
 
-        if isinstance(intencion, IntConsultarSocio | IntConsultarCuotas | IntConsultarCaja):
+        if isinstance(
+            intencion,
+            IntConsultarSocio
+            | IntConsultarCuotas
+            | IntConsultarCaja
+            | IntListarSocios
+            | IntConsultarCreditos
+            | IntLiquidacionLetra,
+        ):
             return await self._ejecutar_consulta()
+
+        if isinstance(intencion, IntPagoTodasLetras):
+            return await self._preparar_pago_todas_letras(intencion)
+
         return self._construir_confirmacion()
+
+    async def _preparar_pago_todas_letras(self, intencion: IntPagoTodasLetras) -> RespuestaDialogo:
+        socio = self.sesion.socios[intencion.socio]
+        resp = await self.cliente.get_creditos_socio(socio.id)
+        if not resp.creditos:
+            return self._cancelar(f"{socio.nombre_completo} no tiene créditos activos.")
+        self.sesion.creditos_todas_letras = resp.creditos
+        letras = ", ".join(str(c.letra_id) for c in resp.creditos)
+        texto = (
+            f"Pago de {intencion.n_cuotas} cuota(s) a TODAS las letras de "
+            f"{socio.nombre_completo}.\n"
+            f"Letras: {letras}\n\n{PROMPT_CONFIRMACION}"
+        )
+        self.sesion.resumen_texto = texto
+        self.sesion.estado = EstadoDialogo.ESPERANDO_CONFIRMACION
+        return RespuestaDialogo(texto=texto, requiere_timeout=True)
 
     async def _recibir_seleccion_socio(self, pendiente: SeleccionPendiente, texto: str) -> RespuestaDialogo:
         indice = parsear_seleccion(texto, len(pendiente.candidatos_socio))
@@ -314,6 +352,12 @@ class MaquinaEstados:
                 texto, pdf_bytes, nombre_pdf = await self._consultar_caja(), None, None
             elif isinstance(intencion, IntConsultarSocio):
                 texto, pdf_bytes, nombre_pdf = await self._consultar_socio(intencion), None, None
+            elif isinstance(intencion, IntListarSocios):
+                texto, pdf_bytes, nombre_pdf = await self._listar_socios(), None, None
+            elif isinstance(intencion, IntConsultarCreditos):
+                texto, pdf_bytes, nombre_pdf = await self._consultar_creditos(intencion), None, None
+            elif isinstance(intencion, IntLiquidacionLetra):
+                texto, pdf_bytes, nombre_pdf = await self._liquidacion_letra(intencion)
             else:
                 assert isinstance(intencion, IntConsultarCuotas)
                 texto, pdf_bytes, nombre_pdf = await self._consultar_cuotas(intencion)
@@ -346,6 +390,38 @@ class MaquinaEstados:
             f"{resuelto.nombre_completo}\n"
             f"Saldo: {formatear_monto(detalle.saldo)}\n"
             f"Créditos activos: {detalle.creditos_activos}"
+        )
+
+    async def _listar_socios(self) -> str:
+        resp = await self.cliente.listar_socios()
+        if not resp.socios:
+            return "No hay socios registrados."
+        lineas = [f"{i}. {s.nombre_completo}" for i, s in enumerate(resp.socios, start=1)]
+        return f"Socios ({len(resp.socios)}):\n" + "\n".join(lineas)
+
+    async def _consultar_creditos(self, intencion: IntConsultarCreditos) -> str:
+        resuelto = self.sesion.socios[intencion.socio]
+        resp = await self.cliente.get_creditos_socio(resuelto.id)
+        if not resp.creditos:
+            return f"{resuelto.nombre_completo} no tiene créditos activos."
+        lineas = [f"Créditos de {resuelto.nombre_completo}:"]
+        for c in resp.creditos:
+            lineas.append(
+                f"• Letra {c.letra_id}: {formatear_monto(c.capital_original)}, "
+                f"{c.n_cuotas_total} cuotas, {c.interes_tasa * 100:.2f}% mensual"
+            )
+        return "\n".join(lineas)
+
+    async def _liquidacion_letra(
+        self, intencion: IntLiquidacionLetra
+    ) -> tuple[str, bytes | None, str | None]:
+        pdf_bytes = await self.cliente.descargar_pdf_liquidacion_actual(intencion.letra_id)
+        if pdf_bytes is None:
+            return (f"No encontré un crédito con la letra {intencion.letra_id}.", None, None)
+        return (
+            f"Aquí está la liquidación actual de la letra {intencion.letra_id}.",
+            pdf_bytes,
+            f"Liquidacion_actual_letra_{intencion.letra_id}.pdf",
         )
 
     async def _consultar_cuotas(self, intencion: IntConsultarCuotas) -> tuple[str, bytes | None, str | None]:
@@ -397,6 +473,22 @@ class MaquinaEstados:
             )
             resp_pago = await self.cliente.registrar_pagos(body_pago, key)
             datos = recibo_desde_pagos(resp_pago)
+        elif isinstance(intencion, IntPagoTodasLetras):
+            socio_id = self.sesion.socios[intencion.socio].id
+            body_todas = PagosRequest(
+                recibi_de_id=socio_id,
+                pagos=[
+                    PagoReqItem(
+                        socio_id=socio_id,
+                        letra_id=c.letra_id,
+                        n_cuotas=intencion.n_cuotas,
+                        abono_capital=0,
+                    )
+                    for c in self.sesion.creditos_todas_letras
+                ],
+            )
+            resp_todas = await self.cliente.registrar_pagos(body_todas, key)
+            datos = recibo_desde_pagos(resp_todas)
         else:
             assert isinstance(intencion, IntRegCombinado)
             body_combinado = CombinadosRequest(
@@ -476,6 +568,7 @@ class MaquinaEstados:
         self.sesion.idempotency_key = None
         self.sesion.resumen_texto = None
         self.sesion.texto_acumulado = None
+        self.sesion.creditos_todas_letras = []
 
 
 # ── Helpers de módulo ──────────────────────────────────────────────────────────
@@ -497,7 +590,9 @@ def _nombres_socios(intencion: Intencion) -> list[str]:
         nombres += [p.nombre for p in intencion.pagos]
     elif isinstance(intencion, IntCrearCredito):
         nombres += list(intencion.socios)
-    elif isinstance(intencion, IntConsultarSocio | IntConsultarCuotas):
+    elif isinstance(intencion, IntConsultarSocio | IntConsultarCuotas | IntConsultarCreditos) or isinstance(
+        intencion, IntPagoTodasLetras
+    ):
         nombres.append(intencion.socio)
     return list(dict.fromkeys(nombres))
 

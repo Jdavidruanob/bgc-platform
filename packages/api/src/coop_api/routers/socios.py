@@ -17,6 +17,25 @@ from coop_api.fuzzy import buscar_socios
 router = APIRouter(prefix="/socios", tags=["socios"])
 
 
+@router.get("/lista", response_model=None)
+def listar_todos(db: DbDep, _auth: AuthDep) -> SociosSearchResponse:
+    """Todos los socios ordenados por nombre. Para que el operador consulte la
+    lista completa cuando no recuerda un nombre exacto."""
+    socios_repo = SociosRepository(db)
+    todos = socios_repo.find_all_full()
+    items = [
+        SocioSearchItem(
+            id=int(str(s["id"])),
+            nombres=str(s["nombres"]),
+            apellidos=str(s["apellidos"]),
+            nombre_completo=f"{s['nombres']} {s['apellidos']}",
+            score=1.0,
+        )
+        for s in todos
+    ]
+    return SociosSearchResponse(socios=items)
+
+
 @router.get("", response_model=None)
 def buscar(
     db: DbDep,

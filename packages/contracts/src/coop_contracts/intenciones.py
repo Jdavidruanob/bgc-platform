@@ -84,6 +84,26 @@ class IntConsultarCaja(BaseModel):
     intencion: Literal["consultar_caja"]
 
 
+class IntListarSocios(BaseModel):
+    intencion: Literal["listar_socios"]
+
+
+class IntConsultarCreditos(BaseModel):
+    intencion: Literal["consultar_creditos"]
+    socio: str
+
+
+class IntLiquidacionLetra(BaseModel):
+    intencion: Literal["liquidacion_letra"]
+    letra_id: int
+
+
+class IntPagoTodasLetras(BaseModel):
+    intencion: Literal["pago_todas_letras"]
+    socio: str
+    n_cuotas: Annotated[int, Field(gt=0)]
+
+
 class IntAyuda(BaseModel):
     intencion: Literal["ayuda"]
     # Sobre qué pide ayuda: "credito", "recibo", "aporte", "pago", "retiro",
@@ -118,6 +138,10 @@ Intencion = (
     | IntConsultarSocio
     | IntConsultarCuotas
     | IntConsultarCaja
+    | IntListarSocios
+    | IntConsultarCreditos
+    | IntLiquidacionLetra
+    | IntPagoTodasLetras
     | IntAyuda
     | IntDesconocida
     | IntIncompleta

@@ -4,11 +4,15 @@ from coop_contracts.intenciones import (
     IntAmbigua,
     IntAyuda,
     IntConsultarCaja,
+    IntConsultarCreditos,
     IntConsultarCuotas,
     IntConsultarSocio,
     IntCrearCredito,
     IntDesconocida,
     IntIncompleta,
+    IntLiquidacionLetra,
+    IntListarSocios,
+    IntPagoTodasLetras,
     IntRegRetiro,
 )
 
@@ -152,6 +156,59 @@ async def test_consultar_cuotas_socio_sin_creditos(api_client: ApiClient) -> Non
 
     assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
     assert "no tiene créditos activos" in respuesta.texto
+
+
+async def test_listar_socios(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    respuesta = await maquina.procesar_intencion(IntListarSocios(intencion="listar_socios"))
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert "Socios" in respuesta.texto
+    # El mock tiene varios socios; deben aparecer numerados
+    assert "1." in respuesta.texto
+
+
+async def test_consultar_creditos_de_un_socio(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    respuesta = await maquina.procesar_intencion(
+        IntConsultarCreditos(intencion="consultar_creditos", socio="Pedro Antonio Gómez Ruiz")
+    )
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert "Letra 450" in respuesta.texto
+    assert "cuotas" in respuesta.texto.lower()
+
+
+async def test_liquidacion_letra_devuelve_pdf(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    respuesta = await maquina.procesar_intencion(
+        IntLiquidacionLetra(intencion="liquidacion_letra", letra_id=450)
+    )
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert "450" in respuesta.texto
+    assert respuesta.documento_pdf is not None
+    assert respuesta.nombre_documento == "Liquidacion_actual_letra_450.pdf"
+
+
+async def test_liquidacion_letra_inexistente(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    respuesta = await maquina.procesar_intencion(
+        IntLiquidacionLetra(intencion="liquidacion_letra", letra_id=9999)
+    )
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert "no encontré" in respuesta.texto.lower()
+
+
+async def test_pago_todas_letras_pide_confirmacion_y_ejecuta(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    respuesta = await maquina.procesar_intencion(
+        IntPagoTodasLetras(intencion="pago_todas_letras", socio="Pedro Antonio Gómez Ruiz", n_cuotas=1)
+    )
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_CONFIRMACION
+    assert "TODAS" in respuesta.texto
+    assert "450" in respuesta.texto
+
+    respuesta2 = await maquina.recibir_confirmacion("sí")
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert respuesta2.documento_pdf is not None
 
 
 # ── Resolución de nombres ─────────────────────────────────────────────────────

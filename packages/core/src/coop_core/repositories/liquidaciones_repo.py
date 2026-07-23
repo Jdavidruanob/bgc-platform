@@ -43,6 +43,23 @@ class LiquidacionesRepository:
         cols = [d[0] for d in cursor.description]
         return [dict(zip(cols, row, strict=False)) for row in cursor.fetchall()]
 
+    def find_all_by_letra(self, letra_id: int) -> list[dict[str, Any]]:
+        """Todas las cuotas (pagadas y pendientes) con su fecha_pago, para la
+        liquidación actual que muestra el estado del crédito."""
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """
+            SELECT nro_cuota, fecha_vencimiento, valor_cuota,
+                   interes_mes, cuota_mensual, saldo_capital, fecha_pago
+            FROM liquidaciones
+            WHERE credito_letra = %s
+            ORDER BY nro_cuota ASC
+            """,
+            (letra_id,),
+        )
+        cols = [d[0] for d in cursor.description]
+        return [dict(zip(cols, row, strict=False)) for row in cursor.fetchall()]
+
     def get_current_debt(self, letra_id: int) -> int:
         cursor = self._conn.cursor()
         cursor.execute(

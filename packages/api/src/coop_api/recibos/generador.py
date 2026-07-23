@@ -75,6 +75,7 @@ class CuotaLiquidacion:
     interes_mes: int
     cuota_mensual: int
     saldo_capital: int
+    fecha_pago: str = ""  # vacío en la liquidación original; con fecha en la actual
 
 
 @dataclass
@@ -311,7 +312,7 @@ def generar_xlsx_liquidacion(datos: DatosLiquidacion) -> bytes:
 
     ws["B7"] = datos.letra_id
     ws["F7"] = format_miles_colombian_int(datos.capital)
-    socios_nombres = [f"{s.nombres} {s.apellidos}".upper() for s in datos.socios]
+    socios_nombres = [f"{s.nombres} {s.apellidos}".upper().strip() for s in datos.socios]
     ws["B9"] = ", Y/O ".join(socios_nombres)
     ws["A12"] = datos.fecha_inicio.strftime("%Y-%m-%d")
     ws["B12"] = datos.n_cuotas
@@ -336,7 +337,7 @@ def generar_xlsx_liquidacion(datos: DatosLiquidacion) -> bytes:
             format_miles_colombian_int(cuota.interes_mes),
             format_miles_colombian_int(cuota.cuota_mensual),
             format_miles_colombian_int(max(0, cuota.saldo_capital)),
-            "",
+            cuota.fecha_pago,
         ]
         for col_idx, valor in enumerate(valores):
             celda = ws[f"{_LIQ_TABLA_COLUMNS[col_idx]}{fila}"]

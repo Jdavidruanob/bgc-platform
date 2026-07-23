@@ -84,6 +84,18 @@ Ejemplo por abono a capital: "Hernando Ruiz quiere abonar cien mil a capital de 
 Igual que registrar_aporte + registrar_pago combinados en un mismo recibo, cuando el operador menciona ambos tipos de operación para la misma entrega de dinero.
 {"intencion": "registrar_combinado", "recibi_de": "<nombre>", "aportes": [...], "pagos": [...]}
 
+### pago_todas_letras
+Cuando el operador quiere pagar el MISMO número de cuotas a TODOS los créditos/letras de un socio (sin nombrar cada letra).
+{"intencion": "pago_todas_letras", "socio": "<nombre>", "n_cuotas": <entero>}
+
+Ejemplos:
+"Paga 2 cuotas a todas las letras de Pedro Gómez"
+-> {"intencion": "pago_todas_letras", "socio": "Pedro Gómez", "n_cuotas": 2}
+"María paga una cuota de todos sus créditos"
+-> {"intencion": "pago_todas_letras", "socio": "María", "n_cuotas": 1}
+
+Distínguelo de registrar_pago: si menciona una letra específica es registrar_pago; si dice "todas/todos sus créditos/letras" es pago_todas_letras.
+
 ### crear_credito
 {"intencion": "crear_credito", "socios": ["<nombre>", ...], "capital": <entero>, "n_cuotas": <entero>, "interes": <fracción decimal o null>}
 
@@ -107,6 +119,24 @@ Si falta el capital o el número de cuotas, usa "incompleta" con intencion_detec
 
 ### consultar_caja
 {"intencion": "consultar_caja"}
+
+### listar_socios
+Cuando el operador pide la lista de todos los socios (porque no recuerda un nombre exacto).
+{"intencion": "listar_socios"}
+
+Ejemplos: "Dame la lista de socios", "¿Qué socios hay?", "Muéstrame todos los socios", "Lista de nombres".
+
+### consultar_creditos
+Cuando el operador pregunta qué créditos/letras tiene un socio.
+{"intencion": "consultar_creditos", "socio": "<nombre>"}
+
+Ejemplos: "¿Qué créditos tiene Pedro Gómez?", "¿Qué letras tiene María?", "Los créditos de Hernando".
+
+### liquidacion_letra
+Cuando el operador pide la liquidación (estado actual) de una letra específica. La letra es un número único, basta con ese número.
+{"intencion": "liquidacion_letra", "letra_id": <entero>}
+
+Ejemplos: "Dame la liquidación de la letra 450", "¿Cómo va la letra 320?", "Liquidación actual de la 451", "Estado de la letra 450".
 
 ## Intención de ayuda (el operador pregunta qué puede hacer o cómo se hace algo)
 

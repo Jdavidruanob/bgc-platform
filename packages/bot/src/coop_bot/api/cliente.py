@@ -90,6 +90,9 @@ class ApiClient:
     async def buscar_socios(self, q: str, limit: int = 10) -> SociosSearchResponse:
         return await self._get("/socios", {"q": q, "limit": limit}, SociosSearchResponse)
 
+    async def listar_socios(self) -> SociosSearchResponse:
+        return await self._get("/socios/lista", {}, SociosSearchResponse)
+
     async def get_socio(self, socio_id: int) -> SocioDetalle:
         return await self._get(f"/socios/{socio_id}", {}, SocioDetalle)
 
@@ -158,6 +161,16 @@ class ApiClient:
     async def descargar_pdf_liquidacion(self, letra_id: int) -> bytes | None:
         """PDF de la liquidación de un crédito. None si el API responde 404."""
         response = await self._pedir(lambda: self._client.get(f"/creditos/{letra_id}/liquidacion/pdf"))
+        if response.status_code == 404:
+            return None
+        if response.is_error:
+            self._lanzar_error(response)
+        return response.content
+
+    async def descargar_pdf_liquidacion_actual(self, letra_id: int) -> bytes | None:
+        """PDF con el estado actual de la liquidación (no se guarda; es de consulta).
+        None si la letra no existe."""
+        response = await self._pedir(lambda: self._client.get(f"/creditos/{letra_id}/liquidacion-actual/pdf"))
         if response.status_code == 404:
             return None
         if response.is_error:

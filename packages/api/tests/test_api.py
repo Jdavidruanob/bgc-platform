@@ -319,6 +319,35 @@ def test_combinado(client: TestClient, socio_pedro, socio_maria, credito_pedro):
     assert len(data["pagos"]) == 1
 
 
+# ── Listado y liquidación actual ──────────────────────────────────────────────
+
+
+def test_listar_todos_socios(client: TestClient, socio_pedro, socio_maria):
+    r = client.get("/socios/lista", headers=AUTH)
+    assert r.status_code == 200
+    nombres = [s["nombre_completo"] for s in r.json()["socios"]]
+    assert "Pedro Antonio Gómez Ruiz" in nombres
+    assert "María López Herrera" in nombres
+
+
+def test_liquidacion_actual_letra_inexistente(client: TestClient):
+    r = client.get("/creditos/9999/liquidacion-actual/pdf", headers=AUTH)
+    assert r.status_code == 404
+
+
+def test_liquidacion_actual_genera_pdf(client: TestClient, credito_pedro):
+    import shutil
+
+    if shutil.which("soffice") is None and shutil.which("libreoffice") is None:
+        import pytest
+
+        pytest.skip("LibreOffice no disponible en este entorno")
+    r = client.get(f"/creditos/{credito_pedro}/liquidacion-actual/pdf", headers=AUTH)
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/pdf"
+    assert r.content[:4] == b"%PDF"
+
+
 # ── Crear crédito ─────────────────────────────────────────────────────────────
 
 

@@ -12,7 +12,7 @@ from datetime import date
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from coop_contracts.mock_data import get_initial_state, make_nombre_completo
 from coop_contracts.respuestas import (
@@ -144,6 +144,22 @@ def health() -> HealthOk:
 # ── Socios ────────────────────────────────────────────────────────────────────
 
 
+@app.get("/socios/lista")
+def listar_todos_socios(_auth: AuthDep = None) -> SociosSearchResponse:
+    items = [
+        SocioSearchItem(
+            id=s["id"],
+            nombres=s["nombres"],
+            apellidos=s["apellidos"],
+            nombre_completo=make_nombre_completo(s),
+            score=1.0,
+        )
+        for s in _state["socios"]
+    ]
+    items.sort(key=lambda x: x.nombre_completo)
+    return SociosSearchResponse(socios=items)
+
+
 @app.get("/socios")
 def buscar_socios(q: str = "", limit: int = 10, _auth: AuthDep = None) -> SociosSearchResponse:
     if not q.strip():
@@ -207,6 +223,14 @@ def get_cuotas_pendientes(letra_id: int, _auth: AuthDep = None) -> CuotasPendien
         deuda_total_actual=deuda_total,
         cuotas_pendientes=cuotas,
     )
+
+
+@app.get("/creditos/{letra_id}/liquidacion-actual/pdf")
+def get_liquidacion_actual(letra_id: int, _auth: AuthDep = None) -> Response:
+    _find_credito(letra_id)
+    # PDF ficticio: mínimo válido para que el bot pueda reenviarlo en tests.
+    contenido = b"%PDF-1.4 mock liquidacion actual letra " + str(letra_id).encode()
+    return Response(content=contenido, media_type="application/pdf")
 
 
 # ── Caja ──────────────────────────────────────────────────────────────────────
