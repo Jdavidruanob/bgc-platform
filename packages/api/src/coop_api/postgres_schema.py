@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS socios (
     saldo       INTEGER DEFAULT 0,
     celular     TEXT,
     photo_path  TEXT,
+    foto        BYTEA,
     whatsapp_e164       TEXT,
     optin_whatsapp_fecha TEXT,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -136,3 +137,10 @@ CONFIG_DEFAULTS = {
     "total_admin": "0",
     "porcentaje_mora": "0.02",
 }
+
+# Migraciones idempotentes para BD ya existentes. `CREATE TABLE IF NOT EXISTS`
+# no agrega columnas a tablas que ya existen, así que los cambios de columna van
+# aquí como ALTER ... IF NOT EXISTS y se ejecutan en el lifespan.
+MIGRATIONS_POSTGRES: tuple[str, ...] = (
+    "ALTER TABLE socios ADD COLUMN IF NOT EXISTS foto BYTEA",
+)

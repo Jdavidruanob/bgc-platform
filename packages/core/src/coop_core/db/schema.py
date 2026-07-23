@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS socios (
     saldo INTEGER DEFAULT 0,
     celular TEXT,
     photo_path TEXT,
+    foto BLOB,
     whatsapp_e164 TEXT,
     optin_whatsapp_fecha TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
