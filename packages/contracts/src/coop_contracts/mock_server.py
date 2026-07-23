@@ -235,6 +235,12 @@ def get_creditos_socio(socio_id: int, _auth: AuthDep = None) -> CreditosResponse
     return CreditosResponse(creditos=creditos)
 
 
+@app.get("/creditos/proxima-letra")
+def get_proxima_letra(_auth: AuthDep = None) -> dict[str, int]:
+    letras = [c["letra_id"] for c in _state["creditos"]]
+    return {"letra": (max(letras) + 1) if letras else 1}
+
+
 @app.get("/creditos/{letra_id}")
 def get_credito(letra_id: int, _auth: AuthDep = None) -> CreditoDetalle:
     c = _find_credito(letra_id)

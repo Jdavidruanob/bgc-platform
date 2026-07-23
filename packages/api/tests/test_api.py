@@ -510,6 +510,17 @@ def test_fuzzy_score():
     assert score_nombre("xyz_no_existe", "Pedro", "Gómez") < 0.5
 
 
+def test_fuzzy_nombre_distorsionado_rescata_por_apellido():
+    """Whisper transcribe 'Magceider' como 'Max Eider'. El apellido (García)
+    debe rescatar al socio correcto por encima del resto de García."""
+    from coop_api.fuzzy import score_nombre
+
+    ganador = score_nombre("Max Eider García", "Magceider", "García Luna")
+    otro = score_nombre("Max Eider García", "Rodrigo", "García Castro")
+    assert ganador >= 0.75
+    assert ganador - otro >= 0.15
+
+
 def test_fuzzy_prioriza_nombre_sobre_apellido():
     """Regresión: en la cooperativa hay muchos apellidos repetidos por parentesco.
     "Maritza Padilla" debe puntuar más alto contra Maritza que contra otros Padilla.

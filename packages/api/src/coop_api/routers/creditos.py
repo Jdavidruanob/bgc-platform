@@ -28,6 +28,13 @@ from coop_api.recibos.repositorio import LiquidacionesArchivosRepository
 router = APIRouter(prefix="/creditos", tags=["creditos"])
 
 
+@router.get("/proxima-letra")
+def get_proxima_letra(db: DbDep, _auth: AuthDep) -> dict[str, int]:
+    """Número de letra que tomaría el próximo crédito (para mostrarlo en la
+    confirmación antes de crearlo)."""
+    return {"letra": CreditosRepository(db).next_letra()}
+
+
 @router.get("/{letra_id}", response_model=None)
 def get_credito(letra_id: int, db: DbDep, _auth: AuthDep) -> CreditoDetalle | JSONResponse:
     """Detalle de un crédito por su letra, incluyendo sus socios titulares.

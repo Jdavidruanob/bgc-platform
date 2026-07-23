@@ -28,20 +28,25 @@ def construir_resumen(
     intencion: Intencion,
     socios: dict[str, SocioResuelto],
     letras: dict[str, int],
+    proxima_letra: int | None = None,
 ) -> str:
     if isinstance(intencion, IntRegRetiro):
         return _resumen_retiro(intencion, socios)
     if isinstance(intencion, IntCrearCredito):
-        return _resumen_crear_credito(intencion, socios)
+        return _resumen_crear_credito(intencion, socios, proxima_letra)
     raise ValueError(f"construir_resumen no soporta la intención {intencion.intencion!r}")
 
 
-def _resumen_crear_credito(intencion: IntCrearCredito, socios: dict[str, SocioResuelto]) -> str:
+def _resumen_crear_credito(
+    intencion: IntCrearCredito, socios: dict[str, SocioResuelto], proxima_letra: int | None = None
+) -> str:
     nombres = [socios[n].nombre_completo for n in intencion.socios]
     interes = intencion.interes if intencion.interes is not None else _INTERES_DEFAULT
     cuota_aprox = intencion.capital // intencion.n_cuotas
-    lineas = [
-        "Nuevo crédito:",
+    lineas = ["Nuevo crédito:"]
+    if proxima_letra is not None:
+        lineas.append(f"- Letra: {proxima_letra}")
+    lineas += [
         f"- Titular(es): {', '.join(nombres)}",
         f"- Capital: {formatear_monto(intencion.capital)}",
         f"- Cuotas: {intencion.n_cuotas} mensuales",

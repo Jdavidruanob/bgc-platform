@@ -88,6 +88,7 @@ async def test_crear_credito_pide_confirmacion(api_client: ApiClient) -> None:
     assert "Nuevo crédito" in respuesta.texto
     assert "1.200.000" in respuesta.texto
     assert "12 mensuales" in respuesta.texto
+    assert "Letra:" in respuesta.texto  # muestra la letra que tomaría
 
 
 async def test_crear_credito_flujo_completo(api_client: ApiClient) -> None:

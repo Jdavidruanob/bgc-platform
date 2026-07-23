@@ -111,6 +111,13 @@ class ApiClient:
         """Detalle del crédito por letra (incluye sus socios). La letra es única."""
         return await self._get(f"/creditos/{letra_id}", {}, CreditoDetalle)
 
+    async def get_proxima_letra(self) -> int:
+        """Número de letra que tomaría el próximo crédito (informativo)."""
+        response = await self._pedir(lambda: self._client.get("/creditos/proxima-letra"))
+        if response.is_error:
+            self._lanzar_error(response)
+        return int(response.json()["letra"])
+
     async def get_cuotas_pendientes(self, letra_id: int) -> CuotasPendientesResponse:
         return await self._get(f"/creditos/{letra_id}/cuotas-pendientes", {}, CuotasPendientesResponse)
 

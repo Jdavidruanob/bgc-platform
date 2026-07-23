@@ -372,12 +372,27 @@ class MaquinaEstados:
         ):
             return await self._ejecutar_consulta()
 
-        # Retiro y crear crédito van por su cuenta (no se combinan).
-        if isinstance(intencion, IntCrearCredito | IntRegRetiro):
+        # Crear crédito: la confirmación muestra la letra que tomaría.
+        if isinstance(intencion, IntCrearCredito):
+            return await self._construir_confirmacion_credito(intencion)
+        # Retiro va por su cuenta (no se combina).
+        if isinstance(intencion, IntRegRetiro):
             return self._construir_confirmacion()
 
         # registrar_aporte / registrar_pago / registrar_combinado → plan
         return await self._finalizar_plan(intencion)
+
+    async def _construir_confirmacion_credito(self, intencion: IntCrearCredito) -> RespuestaDialogo:
+        try:
+            proxima_letra = await self.cliente.get_proxima_letra()
+        except ApiError:
+            proxima_letra = None
+        texto = construir_resumen(
+            intencion, self.sesion.socios, self.sesion.letras, proxima_letra=proxima_letra
+        )
+        self.sesion.resumen_texto = texto
+        self.sesion.estado = EstadoDialogo.ESPERANDO_CONFIRMACION
+        return RespuestaDialogo(texto=texto, requiere_timeout=True)
 
     async def _finalizar_plan(self, intencion: Intencion) -> RespuestaDialogo:
         aportes_items, pagos_items, recibi_de_nombre = _partes_registro(intencion)

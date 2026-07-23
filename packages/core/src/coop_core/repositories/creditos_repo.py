@@ -88,6 +88,15 @@ class CreditosRepository:
         cols = [d[0] for d in cursor.description]
         return [dict(zip(cols, row, strict=False)) for row in cursor.fetchall()]
 
+    def next_letra(self) -> int:
+        """Número de letra que tomaría el próximo crédito (informativo, para la
+        confirmación). En esta cooperativa las letras son secuenciales sin
+        borrados, así que MAX+1 coincide con el que asigna la base."""
+        cursor = self._conn.cursor()
+        cursor.execute("SELECT COALESCE(MAX(letra), 0) + 1 FROM creditos")
+        row = cursor.fetchone()
+        return int(row[0]) if row else 1
+
     def get_socio_ids(self, letra_id: int) -> list[int]:
         cursor = self._conn.cursor()
         cursor.execute(
