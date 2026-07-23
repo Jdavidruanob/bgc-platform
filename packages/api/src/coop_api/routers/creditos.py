@@ -1,8 +1,14 @@
 from datetime import datetime
 
-from coop_contracts.respuestas import CuotaPendiente, CuotasPendientesResponse
+from coop_contracts.respuestas import (
+    CreditoDetalle,
+    CreditoSocio,
+    CuotaPendiente,
+    CuotasPendientesResponse,
+)
 from coop_core.repositories.creditos_repo import CreditosRepository
 from coop_core.repositories.liquidaciones_repo import LiquidacionesRepository
+from coop_core.repositories.socios_repo import SociosRepository
 from coop_core.services.amortization import calculate_mora
 from coop_core.utils.fecha import get_hoy
 from fastapi import APIRouter
@@ -20,6 +26,30 @@ from coop_api.recibos.pdf_converter import PdfConversionError, xlsx_a_pdf
 from coop_api.recibos.repositorio import LiquidacionesArchivosRepository
 
 router = APIRouter(prefix="/creditos", tags=["creditos"])
+
+
+@router.get("/{letra_id}", response_model=None)
+def get_credito(letra_id: int, db: DbDep, _auth: AuthDep) -> CreditoDetalle | JSONResponse:
+    """Detalle de un crédito por su letra, incluyendo sus socios titulares.
+    Sirve para que el bot resuelva la letra → socio (la letra es única)."""
+    creditos_repo = CreditosRepository(db)
+    credito = creditos_repo.find_by_letra(letra_id)
+    if credito is None:
+        return not_found("LETRA_NO_ENCONTRADA", f"No existe un crédito con letra {letra_id}.")
+    socios_repo = SociosRepository(db)
+    socios = []
+    for sid in creditos_repo.get_socio_ids(letra_id):
+        s = socios_repo.find_by_id(sid)
+        if s is not None:
+            socios.append(CreditoSocio(id=int(s["id"]), nombre_completo=f"{s['nombres']} {s['apellidos']}"))
+    return CreditoDetalle(
+        letra_id=letra_id,
+        capital=int(credito["capital"]),
+        interes_tasa=float(credito["interes"]),
+        n_cuotas_total=int(credito["no_cuotas"]),
+        fecha_inicio=str(credito["fecha_inicio"]),
+        socios=socios,
+    )
 
 
 @router.get("/{letra_id}/cuotas-pendientes", response_model=None)

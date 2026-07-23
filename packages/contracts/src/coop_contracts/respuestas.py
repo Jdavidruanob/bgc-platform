@@ -99,6 +99,20 @@ class CreditoResumen(BaseModel):
     socios: list[str]
 
 
+class CreditoSocio(BaseModel):
+    id: int
+    nombre_completo: str
+
+
+class CreditoDetalle(BaseModel):
+    letra_id: int
+    capital: int
+    interes_tasa: float
+    n_cuotas_total: int
+    fecha_inicio: str
+    socios: list[CreditoSocio]
+
+
 class CreditosResponse(BaseModel):
     creditos: list[CreditoResumen]
 

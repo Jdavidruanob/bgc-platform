@@ -58,7 +58,7 @@ async def test_flujo_completo_pago_con_letra_hint(api_client: ApiClient) -> None
 
     respuesta_resumen = await maquina.procesar_intencion(intencion)
     assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_CONFIRMACION
-    assert "letra 451" in respuesta_resumen.texto
+    assert "Letra 451" in respuesta_resumen.texto
 
     respuesta_final = await maquina.recibir_confirmacion("sí")
     assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE

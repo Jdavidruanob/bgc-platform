@@ -24,7 +24,9 @@ from coop_contracts.respuestas import (
     CombinadosRequest,
     CrearCreditoRequest,
     CrearCreditoResponse,
+    CreditoDetalle,
     CreditoResumen,
+    CreditoSocio,
     CreditosResponse,
     CuotaAmortizacion,
     CuotaPendiente,
@@ -228,6 +230,23 @@ def get_creditos_socio(socio_id: int, _auth: AuthDep = None) -> CreditosResponse
         if socio_id in c["socio_ids"]
     ]
     return CreditosResponse(creditos=creditos)
+
+
+@app.get("/creditos/{letra_id}")
+def get_credito(letra_id: int, _auth: AuthDep = None) -> CreditoDetalle:
+    c = _find_credito(letra_id)
+    socios = []
+    for sid in c["socio_ids"]:
+        s = _find_socio(sid)
+        socios.append(CreditoSocio(id=sid, nombre_completo=make_nombre_completo(s)))
+    return CreditoDetalle(
+        letra_id=letra_id,
+        capital=c["capital_original"],
+        interes_tasa=c["interes_tasa"],
+        n_cuotas_total=c["n_cuotas_total"],
+        fecha_inicio=c["fecha_inicio"],
+        socios=socios,
+    )
 
 
 @app.get("/creditos/{letra_id}/cuotas-pendientes")

@@ -50,10 +50,13 @@ _AYUDA_APORTE = (
 )
 
 _AYUDA_PAGO = (
-    "Para registrar un pago de cuota dime quién paga, de qué crédito y cuántas "
-    "cuotas.\n"
-    "Ejemplo: «María López paga 2 cuotas de la letra 450».\n"
-    "También puede ser un abono a capital: «Pedro abona 100 mil a su crédito»."
+    "Para registrar un pago de cuota dime la letra del crédito y cuántas cuotas. "
+    "La letra es única, con eso basta (el nombre es opcional).\n"
+    "Ejemplos:\n"
+    "• «Paga 2 cuotas de la letra 450»\n"
+    "• «1 cuota de la letra 350 y 2 de la 455» (varias letras a la vez)\n"
+    "• «Paga 1 cuota de todos los créditos de Magaly»\n"
+    "También puede ser un abono a capital: «Abona 100 mil a la letra 320»."
 )
 
 _AYUDA_RETIRO = "Para registrar un retiro dime quién retira y cuánto.\nEjemplo: «Juan Pérez retira 200 mil»."

@@ -1,6 +1,7 @@
 from coop_bot.api.cliente import ApiClient
 from coop_bot.dialogo.estados import EstadoDialogo, MaquinaEstados, SesionDialogo
 from coop_contracts.intenciones import (
+    AporteItem,
     IntAmbigua,
     IntAyuda,
     IntConsultarCaja,
@@ -13,8 +14,11 @@ from coop_contracts.intenciones import (
     IntIncompleta,
     IntLiquidacionLetra,
     IntListarSocios,
-    IntPagoTodasLetras,
+    IntRegAporte,
+    IntRegCombinado,
+    IntRegPago,
     IntRegRetiro,
+    PagoItem,
 )
 
 
@@ -236,15 +240,85 @@ async def test_liquidacion_letra_inexistente(api_client: ApiClient) -> None:
 async def test_pago_todas_letras_pide_confirmacion_y_ejecuta(api_client: ApiClient) -> None:
     maquina = _maquina(api_client)
     respuesta = await maquina.procesar_intencion(
-        IntPagoTodasLetras(intencion="pago_todas_letras", socio="Pedro Antonio Gómez Ruiz", n_cuotas=1)
+        IntRegPago(
+            intencion="registrar_pago",
+            recibi_de="Pedro Antonio Gómez Ruiz",
+            pagos=[
+                PagoItem(nombre="Pedro Antonio Gómez Ruiz", todas_las_letras=True, n_cuotas=1),
+            ],
+        )
     )
     assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_CONFIRMACION
-    assert "TODAS" in respuesta.texto
     assert "450" in respuesta.texto
 
     respuesta2 = await maquina.recibir_confirmacion("sí")
     assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
     assert respuesta2.documento_pdf is not None
+
+
+async def test_pago_por_letra_sin_nombre(api_client: ApiClient) -> None:
+    # La letra manda: no hace falta el nombre del socio.
+    maquina = _maquina(api_client)
+    respuesta = await maquina.procesar_intencion(
+        IntRegPago(
+            intencion="registrar_pago",
+            pagos=[PagoItem(letra_id_hint="450", n_cuotas=1)],
+        )
+    )
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_CONFIRMACION
+    assert "450" in respuesta.texto
+
+    respuesta2 = await maquina.recibir_confirmacion("sí")
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert respuesta2.documento_pdf is not None
+
+
+async def test_pago_dos_letras_diferentes_cuotas(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    respuesta = await maquina.procesar_intencion(
+        IntRegPago(
+            intencion="registrar_pago",
+            pagos=[
+                PagoItem(letra_id_hint="450", n_cuotas=1),
+                PagoItem(letra_id_hint="451", n_cuotas=2),
+            ],
+        )
+    )
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_CONFIRMACION
+    assert "450" in respuesta.texto
+    assert "451" in respuesta.texto
+
+
+async def test_combinado_aportes_mas_pago_todas_letras(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    respuesta = await maquina.procesar_intencion(
+        IntRegCombinado(
+            intencion="registrar_combinado",
+            recibi_de="Pedro Antonio Gómez Ruiz",
+            aportes=[
+                AporteItem(nombre="Pedro Antonio Gómez Ruiz", monto=30000),
+                AporteItem(nombre="María López Herrera", monto=20000),
+            ],
+            pagos=[PagoItem(nombre="Pedro Antonio Gómez Ruiz", todas_las_letras=True, n_cuotas=1)],
+        )
+    )
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_CONFIRMACION
+    assert "Aportes" in respuesta.texto
+    assert "Pagos" in respuesta.texto
+
+    respuesta2 = await maquina.recibir_confirmacion("sí")
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert respuesta2.documento_pdf is not None
+
+
+async def test_recibo_excede_limite_de_aportes(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    aportes = [AporteItem(nombre="Pedro Antonio Gómez Ruiz", monto=10000) for _ in range(7)]
+    respuesta = await maquina.procesar_intencion(
+        IntRegAporte(intencion="registrar_aporte", recibi_de="Pedro Antonio Gómez Ruiz", aportes=aportes)
+    )
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert "máximo 6" in respuesta.texto
 
 
 # ── Resolución de nombres ─────────────────────────────────────────────────────

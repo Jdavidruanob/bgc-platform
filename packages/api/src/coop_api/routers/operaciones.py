@@ -43,11 +43,37 @@ router = APIRouter(prefix="/operaciones", tags=["operaciones"])
 
 IdempDep = Annotated[str, Header(alias="Idempotency-Key")]
 
+# Límite físico de las plantillas de recibo: máximo 6 aportes y 6 pagos.
+_MAX_FILAS_RECIBO = 6
+
 
 def _require_idem(idempotency_key: IdempDep = None) -> str:  # type: ignore[assignment]
     if not idempotency_key:
         raise HTTPException(status_code=400, detail="Header Idempotency-Key requerido")
     return idempotency_key
+
+
+def _validar_limite(n_aportes: int, n_pagos: int) -> None:
+    excede = []
+    if n_aportes > _MAX_FILAS_RECIBO:
+        excede.append(f"{n_aportes} aportes")
+    if n_pagos > _MAX_FILAS_RECIBO:
+        excede.append(f"{n_pagos} pagos")
+    if excede:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": {
+                    "codigo": "RECIBO_EXCEDE_LIMITE",
+                    "mensaje": (
+                        f"El recibo soporta máximo {_MAX_FILAS_RECIBO} aportes y "
+                        f"{_MAX_FILAS_RECIBO} pagos. Tienes {' y '.join(excede)}. "
+                        "Divídelo en varios recibos."
+                    ),
+                    "detalle": None,
+                }
+            },
+        )
 
 
 def _get_socio_or_404(socios_repo: SociosRepository, socio_id: int) -> dict[str, object]:
@@ -86,6 +112,7 @@ def registrar_aportes(
     if cached:
         return AportesResponse.model_validate(cached)
 
+    _validar_limite(len(body.aportes), 0)
     socios_repo = SociosRepository(db)
     recibi_de = _get_socio_or_404(socios_repo, body.recibi_de_id)
     aportes_input = []
@@ -184,6 +211,7 @@ def registrar_pagos(
     if cached:
         return PagosResponse.model_validate(cached)
 
+    _validar_limite(0, len(body.pagos))
     socios_repo = SociosRepository(db)
     creditos_repo = CreditosRepository(db)
     recibi_de = _get_socio_or_404(socios_repo, body.recibi_de_id)
@@ -261,6 +289,7 @@ def registrar_combinado(
     if cached:
         return CombinadoResponse.model_validate(cached)
 
+    _validar_limite(len(body.aportes), len(body.pagos))
     socios_repo = SociosRepository(db)
     creditos_repo = CreditosRepository(db)
     recibi_de = _get_socio_or_404(socios_repo, body.recibi_de_id)

@@ -344,6 +344,29 @@ def test_liquidacion_actual_letra_inexistente(client: TestClient):
     assert r.status_code == 404
 
 
+def test_get_credito_por_letra_incluye_socios(client: TestClient, credito_pedro, socio_pedro):
+    r = client.get(f"/creditos/{credito_pedro}", headers=AUTH)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["letra_id"] == credito_pedro
+    ids = [s["id"] for s in data["socios"]]
+    assert socio_pedro in ids
+
+
+def test_pago_excede_limite_de_seis(client: TestClient, socio_pedro, credito_pedro):
+    pagos = [
+        {"socio_id": socio_pedro, "letra_id": credito_pedro, "n_cuotas": 1, "abono_capital": 0}
+        for _ in range(7)
+    ]
+    r = client.post(
+        "/operaciones/pagos",
+        json={"recibi_de_id": socio_pedro, "pagos": pagos},
+        headers=_idem(),
+    )
+    assert r.status_code == 422
+    assert "RECIBO_EXCEDE_LIMITE" in r.text
+
+
 def test_liquidacion_actual_genera_pdf(client: TestClient, credito_pedro):
     import shutil
 

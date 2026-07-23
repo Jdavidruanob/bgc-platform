@@ -26,7 +26,8 @@ Reglas generales:
 
 Álvaro tampoco dice explícitamente "recibí de fulano". Regla para inferirlo automáticamente:
 
-- Para `registrar_aporte`, `registrar_pago` y `registrar_combinado`: `recibi_de` es el PRIMER socio mencionado en el mensaje (o en el mensaje acumulado). Ese es el que trae la plata. No importa si él aparece en aportes, en pagos, o en ambos.
+- Para `registrar_aporte`, `registrar_pago` y `registrar_combinado`: `recibi_de` es el PRIMER socio mencionado por NOMBRE en el mensaje. Ese es el que trae la plata.
+- Si NO se menciona ningún nombre (por ejemplo un pago solo por letras), pon `recibi_de` en null: el sistema usará el titular de la primera letra.
 - Para `registrar_retiro`: no aplica `recibi_de` — solo hay `socio` (el que retira).
 - Si el mismo socio aporta y no se menciona a nadie más como quien entrega, ese socio es también `recibi_de`.
 
@@ -44,9 +45,9 @@ Ejemplo C — con palabra "recibo" al inicio:
 "Realizar recibo, Miguel Burbano aporta 80 mil y paga una cuota de la letra 320"
 -> {"intencion": "registrar_combinado", "recibi_de": "Miguel Burbano", "aportes": [{"nombre": "Miguel Burbano", "monto": 80000}], "pagos": [{"nombre": "Miguel Burbano", "letra_id_hint": "320", "n_cuotas": 1, "abono_capital": 0}]}
 
-Ejemplo D — pago simple:
-"María López paga dos cuotas de la 450"
--> {"intencion": "registrar_pago", "recibi_de": "María López", "pagos": [{"nombre": "María López", "letra_id_hint": "450", "n_cuotas": 2, "abono_capital": 0}]}
+Ejemplo D — pago simple (la letra manda, no hace falta nombre):
+"Paga dos cuotas de la 450"
+-> {"intencion": "registrar_pago", "recibi_de": null, "pagos": [{"nombre": null, "letra_id_hint": "450", "todas_las_letras": false, "n_cuotas": 2, "abono_capital": 0}]}
 
 Ejemplo E — retiro (no usa recibi_de):
 "Pedro Gómez retira doscientos mil"
@@ -55,7 +56,7 @@ Ejemplo E — retiro (no usa recibi_de):
 ## Intenciones de registro (mueven dinero)
 
 ### registrar_aporte
-{"intencion": "registrar_aporte", "recibi_de": "<nombre de quien entrega el dinero>", "aportes": [{"nombre": "<nombre del socio aportante>", "monto": <entero>}]}
+{"intencion": "registrar_aporte", "recibi_de": "<nombre o null>", "aportes": [{"nombre": "<nombre del socio aportante>", "monto": <entero>, "familia": <true|false>}]}
 
 Ejemplo simple: "Le recibí a Pedro Gómez su aporte de ochenta mil"
 -> {"intencion": "registrar_aporte", "recibi_de": "Pedro Gómez", "aportes": [{"nombre": "Pedro Gómez", "monto": 80000}]}
@@ -70,31 +71,58 @@ Ejemplo: "María López va a retirar doscientos mil"
 -> {"intencion": "registrar_retiro", "socio": "María López", "monto": 200000}
 
 ### registrar_pago
-{"intencion": "registrar_pago", "recibi_de": "<nombre de quien entrega el dinero>", "pagos": [{"nombre": "<nombre del socio>", "letra_id_hint": "<número de letra si se mencionó, si no null>", "n_cuotas": <entero, 0 si no aplica>, "abono_capital": <entero, 0 si no aplica>}]}
+{"intencion": "registrar_pago", "recibi_de": "<nombre o null>", "pagos": [{"nombre": "<nombre o null>", "letra_id_hint": "<número de letra o null>", "todas_las_letras": <true|false>, "n_cuotas": <entero, 0 si no aplica>, "abono_capital": <entero, 0 si no aplica>}]}
 
-`n_cuotas` y `abono_capital` son excluyentes: exactamente uno debe ser mayor que 0.
+REGLAS DE LOS PAGOS (muy importantes):
+- **La LETRA manda.** Un pago se identifica por su número de letra, que es único. Si el operador da la letra, con eso basta: pon `letra_id_hint` con el número y `nombre` en null (aunque diga un nombre, la letra tiene prioridad).
+- El `nombre` en un pago es opcional: solo sirve cuando NO se dio la letra (para saber de qué socio) o para confirmar.
+- `n_cuotas` y `abono_capital` son excluyentes: exactamente uno debe ser mayor que 0.
+- **UN PAGO POR CADA LETRA.** Si mencionan varias letras, genera un ítem de pago por cada una. "Letra 415 y 444" son DOS letras distintas → dos ítems.
+- `todas_las_letras: true` cuando pide pagar a TODOS los créditos/letras de un socio sin nombrar cada letra (ahí `nombre` es obligatorio y `letra_id_hint` va null).
 
-Ejemplo por cuotas: "Pedro Gómez pagó dos cuotas de su letra 450"
--> {"intencion": "registrar_pago", "recibi_de": "Pedro Gómez", "pagos": [{"nombre": "Pedro Gómez", "letra_id_hint": "450", "n_cuotas": 2, "abono_capital": 0}]}
+Ejemplo por letra (la letra basta, sin nombre):
+"Paga 1 cuota de la letra 450"
+-> {"intencion": "registrar_pago", "recibi_de": null, "pagos": [{"nombre": null, "letra_id_hint": "450", "todas_las_letras": false, "n_cuotas": 1, "abono_capital": 0}]}
+
+Ejemplo dos letras, MISMO número de cuotas:
+"Paga 1 cuota de la letra 415 y 444"
+-> {"intencion": "registrar_pago", "recibi_de": null, "pagos": [{"nombre": null, "letra_id_hint": "415", "todas_las_letras": false, "n_cuotas": 1, "abono_capital": 0}, {"nombre": null, "letra_id_hint": "444", "todas_las_letras": false, "n_cuotas": 1, "abono_capital": 0}]}
+
+Ejemplo dos letras, DISTINTO número de cuotas:
+"1 cuota de la letra 350 y 2 de la letra 455"
+-> {"intencion": "registrar_pago", "recibi_de": null, "pagos": [{"nombre": null, "letra_id_hint": "350", "todas_las_letras": false, "n_cuotas": 1, "abono_capital": 0}, {"nombre": null, "letra_id_hint": "455", "todas_las_letras": false, "n_cuotas": 2, "abono_capital": 0}]}
 
 Ejemplo por abono a capital: "Hernando Ruiz quiere abonar cien mil a capital de su crédito"
--> {"intencion": "registrar_pago", "recibi_de": "Hernando Ruiz", "pagos": [{"nombre": "Hernando Ruiz", "letra_id_hint": null, "n_cuotas": 0, "abono_capital": 100000}]}
+-> {"intencion": "registrar_pago", "recibi_de": "Hernando Ruiz", "pagos": [{"nombre": "Hernando Ruiz", "letra_id_hint": null, "todas_las_letras": false, "n_cuotas": 0, "abono_capital": 100000}]}
+
+Ejemplo todas las letras:
+"Paga 1 cuota de todos los créditos de Magaly"
+-> {"intencion": "registrar_pago", "recibi_de": null, "pagos": [{"nombre": "Magaly", "letra_id_hint": null, "todas_las_letras": true, "n_cuotas": 1, "abono_capital": 0}]}
 
 ### registrar_combinado
-Igual que registrar_aporte + registrar_pago combinados en un mismo recibo, cuando el operador menciona ambos tipos de operación para la misma entrega de dinero.
-{"intencion": "registrar_combinado", "recibi_de": "<nombre>", "aportes": [...], "pagos": [...]}
+TODO lo que sean aportes + pagos (incluyendo abono a capital y "todas las letras") va en UN SOLO recibo combinado. Úsalo siempre que haya al menos un aporte Y al menos un pago en el mismo mensaje.
+{"intencion": "registrar_combinado", "recibi_de": "<nombre o null>", "aportes": [...], "pagos": [...]}
 
-### pago_todas_letras
-Cuando el operador quiere pagar el MISMO número de cuotas a TODOS los créditos/letras de un socio (sin nombrar cada letra).
-{"intencion": "pago_todas_letras", "socio": "<nombre>", "n_cuotas": <entero>}
+Solo NO se combinan el retiro y el crédito nuevo (esos van solos).
 
-Ejemplos:
-"Paga 2 cuotas a todas las letras de Pedro Gómez"
--> {"intencion": "pago_todas_letras", "socio": "Pedro Gómez", "n_cuotas": 2}
-"María paga una cuota de todos sus créditos"
--> {"intencion": "pago_todas_letras", "socio": "María", "n_cuotas": 1}
+Ejemplo combinado con "todas las letras":
+"Aportes de Magaly 30 mil, Nathalia 20 mil y paga 1 cuota de todos los créditos de Magaly"
+-> {"intencion": "registrar_combinado", "recibi_de": "Magaly", "aportes": [{"nombre": "Magaly", "monto": 30000}, {"nombre": "Nathalia", "monto": 20000}], "pagos": [{"nombre": "Magaly", "letra_id_hint": null, "todas_las_letras": true, "n_cuotas": 1, "abono_capital": 0}]}
 
-Distínguelo de registrar_pago: si menciona una letra específica es registrar_pago; si dice "todas/todos sus créditos/letras" es pago_todas_letras.
+Ejemplo combinado grande (varios aportes + varias letras con distintas cuotas):
+"Aporta Pedro 50 mil, María 30 mil, Juan 20 mil; y paga 1 cuota de la letra 350 y 2 de la 455"
+-> {"intencion": "registrar_combinado", "recibi_de": "Pedro", "aportes": [{"nombre": "Pedro", "monto": 50000}, {"nombre": "María", "monto": 30000}, {"nombre": "Juan", "monto": 20000}], "pagos": [{"nombre": null, "letra_id_hint": "350", "todas_las_letras": false, "n_cuotas": 1, "abono_capital": 0}, {"nombre": null, "letra_id_hint": "455", "todas_las_letras": false, "n_cuotas": 2, "abono_capital": 0}]}
+
+### Familias en los aportes
+Cuando el operador dice que "la familia de X" aporta un mismo monto cada uno, usa el flag `familia: true` en el aporte (el monto se aplica a cada miembro de la familia). Si menciona los montos uno por uno (lo usual), NO uses familia: pon un aporte por cada persona con su monto.
+
+Ejemplo familia mismo monto:
+"La familia de Harvey aporta 30 mil cada uno"
+-> {"intencion": "registrar_aporte", "recibi_de": "Harvey", "aportes": [{"nombre": "Harvey", "monto": 30000, "familia": true}]}
+
+Ejemplo familia con montos distintos (lo normal, itemizado):
+"Harvey y su familia: Harvey 50 mil, Marcela 30 mil, Isabella 20 mil"
+-> {"intencion": "registrar_aporte", "recibi_de": "Harvey", "aportes": [{"nombre": "Harvey", "monto": 50000}, {"nombre": "Marcela", "monto": 30000}, {"nombre": "Isabella", "monto": 20000}]}
 
 ### crear_credito
 {"intencion": "crear_credito", "socios": ["<nombre>", ...], "capital": <entero>, "n_cuotas": <entero>, "interes": <fracción decimal o null>}

@@ -14,6 +14,7 @@ from coop_contracts.respuestas import (
     CombinadosRequest,
     CrearCreditoRequest,
     CrearCreditoResponse,
+    CreditoDetalle,
     CreditosResponse,
     CuotasPendientesResponse,
     FamiliaResponse,
@@ -102,6 +103,10 @@ class ApiClient:
 
     async def get_creditos_socio(self, socio_id: int) -> CreditosResponse:
         return await self._get(f"/socios/{socio_id}/creditos", {}, CreditosResponse)
+
+    async def get_credito(self, letra_id: int) -> CreditoDetalle:
+        """Detalle del crédito por letra (incluye sus socios). La letra es única."""
+        return await self._get(f"/creditos/{letra_id}", {}, CreditoDetalle)
 
     async def get_cuotas_pendientes(self, letra_id: int) -> CuotasPendientesResponse:
         return await self._get(f"/creditos/{letra_id}/cuotas-pendientes", {}, CuotasPendientesResponse)

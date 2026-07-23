@@ -8,13 +8,23 @@ from pydantic import BaseModel, Field, model_validator
 class AporteItem(BaseModel):
     nombre: str = Field(..., description="Nombre del socio tal como fue mencionado")
     monto: Annotated[int, Field(gt=0)] = Field(..., description="Monto en pesos enteros")
+    familia: bool = Field(
+        default=False,
+        description="Si es True, el monto se aporta a CADA miembro de la familia de `nombre`.",
+    )
 
 
 class PagoItem(BaseModel):
-    nombre: str
+    # El pago se identifica por la LETRA (única). El nombre es opcional: sirve
+    # para confirmar, o para resolver la letra cuando no se dio el número.
+    nombre: str | None = None
     letra_id_hint: str | None = Field(
         None,
         description="Número de letra si el usuario lo mencionó explícitamente. Null si no.",
+    )
+    todas_las_letras: bool = Field(
+        default=False,
+        description="Si es True, se paga a TODAS las letras del socio `nombre`.",
     )
     n_cuotas: Annotated[int, Field(ge=0)] = 0
     abono_capital: Annotated[int, Field(ge=0)] = 0
@@ -25,12 +35,22 @@ class PagoItem(BaseModel):
             raise ValueError("n_cuotas y abono_capital son excluyentes")
         if self.n_cuotas == 0 and self.abono_capital == 0:
             raise ValueError("Debe especificarse n_cuotas o abono_capital")
+        if self.todas_las_letras:
+            if not self.nombre:
+                raise ValueError("todas_las_letras requiere el nombre del socio")
+            if self.letra_id_hint is not None:
+                raise ValueError("todas_las_letras no se combina con una letra específica")
+            if self.abono_capital > 0:
+                raise ValueError("todas_las_letras solo aplica con n_cuotas, no abono a capital")
+        elif not self.nombre and self.letra_id_hint is None:
+            raise ValueError("Cada pago necesita la letra o el nombre del socio")
         return self
 
 
 class IntRegAporte(BaseModel):
     intencion: Literal["registrar_aporte"]
-    recibi_de: str = Field(..., description="Nombre del socio que entrega el dinero")
+    # Quien entrega el dinero. Opcional: si no se dice, es el primer socio.
+    recibi_de: str | None = None
     aportes: list[AporteItem] = Field(..., min_length=1)
 
 
@@ -42,13 +62,14 @@ class IntRegRetiro(BaseModel):
 
 class IntRegPago(BaseModel):
     intencion: Literal["registrar_pago"]
-    recibi_de: str
+    # Opcional: con letra basta. Si no se dice, es el titular de la primera letra.
+    recibi_de: str | None = None
     pagos: list[PagoItem] = Field(..., min_length=1)
 
 
 class IntRegCombinado(BaseModel):
     intencion: Literal["registrar_combinado"]
-    recibi_de: str
+    recibi_de: str | None = None
     aportes: list[AporteItem]
     pagos: list[PagoItem]
 
@@ -103,12 +124,6 @@ class IntLiquidacionLetra(BaseModel):
     letras: list[int] = Field(..., min_length=1, description="Una o varias letras a liquidar")
 
 
-class IntPagoTodasLetras(BaseModel):
-    intencion: Literal["pago_todas_letras"]
-    socio: str
-    n_cuotas: Annotated[int, Field(gt=0)]
-
-
 class IntAyuda(BaseModel):
     intencion: Literal["ayuda"]
     # Sobre qué pide ayuda: "credito", "recibo", "aporte", "pago", "retiro",
@@ -147,7 +162,6 @@ Intencion = (
     | IntConsultarCreditos
     | IntConsultarFamilia
     | IntLiquidacionLetra
-    | IntPagoTodasLetras
     | IntAyuda
     | IntDesconocida
     | IntIncompleta
