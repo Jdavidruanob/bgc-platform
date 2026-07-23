@@ -42,9 +42,8 @@ class ResolucionLetra:
     candidatos: list[CreditoResumen] = field(default_factory=list)
 
 
-_UMBRAL_SCORE_GANADOR = 0.70
-_UMBRAL_BRECHA_GANADOR = 0.20
-_UMBRAL_RATIO_GANADOR = 1.5
+_UMBRAL_SCORE_GANADOR = 0.75
+_UMBRAL_BRECHA_GANADOR = 0.15
 
 
 async def resolver_socio(cliente: ApiClient, nombre: str) -> ResolucionSocio:
@@ -76,19 +75,15 @@ async def _resolver_unico(cliente: ApiClient, nombre: str, elegido: SocioSearchI
 def _tiene_ganador_claro(candidatos: list[SocioSearchItem]) -> bool:
     """Auto-selección cuando el mejor candidato es claramente superior.
 
-    Álvaro escribe el nombre de un socio conocido; si el fuzzy match del backend
-    devuelve un ganador con score razonable (>= 0.70) y le saca al segundo
-    tanto por diferencia absoluta (>= 0.20) como por ratio (>= 1.5x),
-    preguntar es ruido, no seguridad.
+    Con el fuzzy que prioriza el nombre de pila, el ganador correcto le saca una
+    brecha amplia al resto incluso cuando comparten apellidos. Basta con un score
+    razonable (>= 0.75) y una brecha >= 0.15 sobre el segundo. Homónimos reales
+    (dos socios que coinciden igual de bien) quedan empatados y sí se preguntan.
     """
     mejor, segundo = candidatos[0], candidatos[1]
     if mejor.score < _UMBRAL_SCORE_GANADOR:
         return False
-    if segundo.score <= 0:
-        return True
-    brecha_ok = (mejor.score - segundo.score) >= _UMBRAL_BRECHA_GANADOR
-    ratio_ok = (mejor.score / segundo.score) >= _UMBRAL_RATIO_GANADOR
-    return brecha_ok and ratio_ok
+    return (mejor.score - segundo.score) >= _UMBRAL_BRECHA_GANADOR
 
 
 async def resolver_letra(cliente: ApiClient, socio_id: int, letra_hint: str | None) -> ResolucionLetra:

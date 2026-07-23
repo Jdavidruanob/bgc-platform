@@ -590,8 +590,9 @@ def _nombres_socios(intencion: Intencion) -> list[str]:
         nombres += [p.nombre for p in intencion.pagos]
     elif isinstance(intencion, IntCrearCredito):
         nombres += list(intencion.socios)
-    elif isinstance(intencion, IntConsultarSocio | IntConsultarCuotas | IntConsultarCreditos) or isinstance(
-        intencion, IntPagoTodasLetras
+    elif isinstance(
+        intencion,
+        IntConsultarSocio | IntConsultarCuotas | IntConsultarCreditos | IntPagoTodasLetras,
     ):
         nombres.append(intencion.socio)
     return list(dict.fromkeys(nombres))

@@ -17,6 +17,7 @@ from typing import Any
 from coop_core.utils.formato import format_full_name_for_excel, format_miles_colombian_int
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment
+from openpyxl.worksheet.properties import PageSetupProperties
 
 _MAX_FILAS = 6
 _GASTO_POR_APORTE = 3000
@@ -109,6 +110,15 @@ def _guardar(wb: Any) -> bytes:
     buffer = io.BytesIO()
     wb.save(buffer)
     return buffer.getvalue()
+
+
+def _forzar_horizontal(ws: Any) -> None:
+    """Orientación horizontal + ajuste a una página de ancho, para que
+    LibreOffice no corte el recibo al convertir a PDF."""
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
 
 
 def _cuota_display(pago: LineaPago) -> str:
@@ -210,6 +220,10 @@ def generar_xlsx_retiro(datos: DatosRecibo) -> bytes:
     ws["C15"] = socio.apellidos.upper()
     ws["C18"] = f"{socio.nombres} {socio.apellidos}".upper()
     ws["C18"].alignment = Alignment(horizontal="center")
+
+    # La plantilla de retiro viene en vertical y el PDF se corta al convertir.
+    # Se fuerza horizontal + ajuste a una página de ancho, como los demás recibos.
+    _forzar_horizontal(ws)
 
     return _guardar(wb)
 

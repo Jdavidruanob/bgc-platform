@@ -475,3 +475,25 @@ def test_fuzzy_tolerante_a_tildes_y_espacios_de_whisper():
 
     # Query mayúsculas / minúsculas
     assert score_nombre("PEDRO GOMEZ", "pedro", "gómez") >= 0.7
+
+
+def test_fuzzy_brecha_amplia_cuando_solo_el_nombre_distingue():
+    """Regresión de casos reales: al dar nombre completo con apellidos comunes,
+    el ganador debe sacar >= 0.15 de brecha para que el bot lo auto-seleccione."""
+    from coop_api.fuzzy import score_nombre
+
+    # Maritza vs otros Padilla Jojoa
+    ganador = score_nombre("Maritza Padilla Jojoa", "Maritza Del S.", "Padilla Jojoa")
+    segundo = max(
+        score_nombre("Maritza Padilla Jojoa", "Sonnia Mabel", "Padilla Jojoa"),
+        score_nombre("Maritza Padilla Jojoa", "Fanny Patricia", "Padilla Jojoa"),
+    )
+    assert ganador - segundo >= 0.15
+
+    # Marcela Salazar vs otros Salazar
+    ganador2 = score_nombre("Marcela Salazar Flores", "Marcela", "Salazar Florez")
+    segundo2 = max(
+        score_nombre("Marcela Salazar Flores", "Mariana García", "Salazar"),
+        score_nombre("Marcela Salazar Flores", "Isabella García", "Salazar"),
+    )
+    assert ganador2 - segundo2 >= 0.15

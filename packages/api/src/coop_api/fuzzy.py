@@ -1,16 +1,19 @@
 """Búsqueda fuzzy de socios usando rapidfuzz.
 
-El operador dicta un nombre por voz o texto. El nombre de pila importa más que
-el apellido porque en la cooperativa hay muchos socios con los mismos apellidos
-(por parentesco). "Maritza Padilla" debe ganarle a "Fanny Padilla Jojoa" aunque
-comparten apellido: la palabra "Maritza" es lo que la desambigua.
+El operador dicta un nombre por voz o texto. El nombre de pila importa mucho más
+que el apellido porque en la cooperativa hay muchos socios con los mismos
+apellidos (por parentesco). "Maritza Padilla Jojoa" debe ganarle con amplitud a
+"Fanny Padilla Jojoa" aunque comparten los dos apellidos: la palabra "Maritza"
+es lo único que las distingue.
 
 Estrategia:
-- Comparar la query contra nombres y apellidos por separado.
-- El score compuesto es promedio ponderado 70% nombres, 30% apellidos.
-- Se compara también contra el nombre completo para no perder matches globales.
-- Se elige el máximo entre el compuesto y el global.
-- Un match exacto o de substring da bonus explícito.
+- Si la query es igual o subcadena del nombre completo, match casi perfecto.
+- Si no, el score combina dos señales:
+  - `match_nombre`: qué tan bien el nombre de pila de la query (primer token)
+    coincide con ALGÚN nombre de pila del candidato. Es el gran discriminador.
+  - `match_full`: solapamiento de tokens de la query con el nombre completo.
+  El nombre de pila pesa fuerte (0.45) para que dos socios con los mismos
+  apellidos no queden empatados: gana quien además comparte el nombre.
 """
 
 from __future__ import annotations
@@ -19,8 +22,8 @@ import unicodedata
 
 from rapidfuzz import fuzz
 
-_PESO_NOMBRES = 0.7
-_PESO_APELLIDOS = 0.3
+_PESO_FULL = 0.55
+_PESO_NOMBRE = 0.45
 
 
 def _normalizar(texto: str) -> str:
@@ -43,18 +46,14 @@ def score_nombre(query: str, nombres: str, apellidos: str) -> float:
     if q == completo:
         return 1.0
     if q in completo:
-        return 0.92
+        return 0.95
 
-    score_n = fuzz.token_set_ratio(q, n) / 100.0
-    score_a = fuzz.token_set_ratio(q, a) / 100.0
-    compuesto = _PESO_NOMBRES * score_n + _PESO_APELLIDOS * score_a
+    primer_token = q.split()[0]
+    nombre_tokens = n.split() or [""]
+    match_nombre = max(fuzz.ratio(primer_token, nt) for nt in nombre_tokens) / 100.0
+    match_full = fuzz.token_set_ratio(q, completo) / 100.0
 
-    # Deliberadamente NO se usa partial_ratio contra el nombre completo: premia
-    # subcadenas contiguas como "padilla" y termina favoreciendo apellidos
-    # comunes sobre coincidencias reales de nombre de pila.
-    ratio_global = fuzz.token_sort_ratio(q, completo) / 100.0
-
-    return round(max(compuesto, ratio_global), 4)
+    return round(_PESO_FULL * match_full + _PESO_NOMBRE * match_nombre, 4)
 
 
 def buscar_socios(
