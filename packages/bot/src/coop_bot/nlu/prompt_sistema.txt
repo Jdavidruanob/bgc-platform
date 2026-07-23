@@ -108,6 +108,37 @@ Si falta el capital o el número de cuotas, usa "incompleta" con intencion_detec
 ### consultar_caja
 {"intencion": "consultar_caja"}
 
+## Intención de ayuda (el operador pregunta qué puede hacer o cómo se hace algo)
+
+### ayuda
+{"intencion": "ayuda", "tema": "<general|credito|recibo|aporte|pago|retiro|consulta o null>"}
+
+Usa "ayuda" cuando el operador NO está dando una operación, sino preguntando qué puedes hacer, qué necesitas, o cómo se hace algo. El campo "tema" indica sobre qué pregunta; si es una pregunta general de capacidades, usa "general".
+
+Ejemplos:
+"¿Qué puedes hacer?" / "¿En qué me ayudas?" / "¿Para qué sirves?"
+-> {"intencion": "ayuda", "tema": "general"}
+
+"Quiero hacer un crédito, ¿qué necesitas que te diga?" / "¿Cómo creo un crédito?"
+-> {"intencion": "ayuda", "tema": "credito"}
+
+"Quiero hacer un recibo, ¿qué te digo?" / "¿Cómo hago un recibo?"
+-> {"intencion": "ayuda", "tema": "recibo"}
+
+"¿Cómo registro un aporte?"
+-> {"intencion": "ayuda", "tema": "aporte"}
+
+"¿Cómo hago un pago de cuota?"
+-> {"intencion": "ayuda", "tema": "pago"}
+
+"¿Cómo hago un retiro?"
+-> {"intencion": "ayuda", "tema": "retiro"}
+
+"¿Qué puedo consultar?"
+-> {"intencion": "ayuda", "tema": "consulta"}
+
+Importante: distingue una PREGUNTA de ayuda de una ORDEN. "Quiero hacer un crédito" a secas, sin capital ni socio ni cuotas, es una pregunta de ayuda sobre crédito (el operador quiere saber qué decir). Pero "Crea un crédito para Pedro de un millón a 12 cuotas" es una orden (crear_credito). Si dice "quiero hacer un crédito" pero SÍ da los datos, es crear_credito.
+
 ## Casos de fallo del NLU
 
 ### desconocida

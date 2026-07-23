@@ -84,6 +84,13 @@ class IntConsultarCaja(BaseModel):
     intencion: Literal["consultar_caja"]
 
 
+class IntAyuda(BaseModel):
+    intencion: Literal["ayuda"]
+    # Sobre qué pide ayuda: "credito", "recibo", "aporte", "pago", "retiro",
+    # "consulta" o "general" (o null para ayuda general).
+    tema: str | None = None
+
+
 class IntDesconocida(BaseModel):
     intencion: Literal["desconocida"]
     texto_original: str
@@ -111,6 +118,7 @@ Intencion = (
     | IntConsultarSocio
     | IntConsultarCuotas
     | IntConsultarCaja
+    | IntAyuda
     | IntDesconocida
     | IntIncompleta
     | IntAmbigua

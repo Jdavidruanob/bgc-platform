@@ -2,6 +2,7 @@ from coop_bot.api.cliente import ApiClient
 from coop_bot.dialogo.estados import EstadoDialogo, MaquinaEstados, SesionDialogo
 from coop_contracts.intenciones import (
     IntAmbigua,
+    IntAyuda,
     IntConsultarCaja,
     IntConsultarCuotas,
     IntConsultarSocio,
@@ -51,6 +52,21 @@ async def test_intencion_ambigua(api_client: ApiClient) -> None:
     )
     respuesta = await maquina.procesar_intencion(intencion)
     assert "registrar_aporte" in respuesta.texto
+
+
+async def test_ayuda_general_lista_capacidades(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    respuesta = await maquina.procesar_intencion(IntAyuda(intencion="ayuda", tema="general"))
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert "Aportes" in respuesta.texto
+    assert "crédito" in respuesta.texto.lower()
+
+
+async def test_ayuda_credito_es_especifica(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    respuesta = await maquina.procesar_intencion(IntAyuda(intencion="ayuda", tema="credito"))
+    assert "cuotas" in respuesta.texto.lower()
+    assert "1%" in respuesta.texto or "1 %" in respuesta.texto
 
 
 async def test_crear_credito_pide_confirmacion(api_client: ApiClient) -> None:

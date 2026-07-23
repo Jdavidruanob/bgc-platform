@@ -55,12 +55,27 @@ _AGRADECIMIENTOS = {
     "vale",
     "ok gracias",
 }
-_MENSAJE_BIENVENIDA = (
-    "Hola Álvaro, soy tu asistente de la cooperativa BGC. "
-    "Cuéntame por texto o nota de voz qué necesitas: registrar un aporte, "
-    "un pago de cuota, un retiro, o consultarme el saldo de un socio, "
-    "las cuotas pendientes de un crédito, o cuánto hay en caja."
-)
+
+
+def _nombre_operador(update: Update) -> str:
+    """Nombre de pila del perfil de Telegram de quien escribe. Se usa para
+    saludar por nombre (Álvaro, Mary, Jose...). Cadena vacía si no viene."""
+    if update.effective_user is None:
+        return ""
+    return (update.effective_user.first_name or "").strip()
+
+
+def _mensaje_bienvenida(update: Update) -> str:
+    nombre = _nombre_operador(update)
+    saludo = f"Hola {nombre}" if nombre else "Hola"
+    return (
+        f"{saludo}, soy tu asistente de la cooperativa BGC. ¿En qué te ayudo hoy?\n\n"
+        "Puedes pedirme registrar un aporte, un pago de cuota, un retiro, "
+        "crear un crédito, o consultarme el saldo de un socio, las cuotas de un "
+        "crédito, o cuánto hay en caja. También entiendo notas de voz.\n\n"
+        "Si no sabes cómo pedir algo, pregúntame — por ejemplo «¿qué necesitas "
+        "para crear un crédito?» y te explico."
+    )
 
 
 def _texto_normalizado(texto: str) -> str:
@@ -117,7 +132,7 @@ async def on_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _es_operador(update, context):
         return
     chat_id = _chat_id(update)
-    await enviar_texto(context, chat_id, _MENSAJE_BIENVENIDA)
+    await enviar_texto(context, chat_id, _mensaje_bienvenida(update))
 
 
 async def on_cancelar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -172,10 +187,12 @@ async def _procesar_texto_entrante(update: Update, context: ContextTypes.DEFAULT
         respuesta = await maquina.recibir_confirmacion(texto)
     elif sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE:
         if _es_saludo(texto):
-            await enviar_texto(context, chat_id, _MENSAJE_BIENVENIDA)
+            await enviar_texto(context, chat_id, _mensaje_bienvenida(update))
             return
         if _es_agradecimiento(texto):
-            await enviar_texto(context, chat_id, "Con gusto, Álvaro. Aquí estoy si necesitas algo más.")
+            nombre = _nombre_operador(update)
+            despedida = f"Con gusto, {nombre}." if nombre else "Con gusto."
+            await enviar_texto(context, chat_id, f"{despedida} Aquí estoy si necesitas algo más.")
             return
         texto_para_llm = f"{sesion.texto_acumulado}. {texto}" if sesion.texto_acumulado else texto
         try:

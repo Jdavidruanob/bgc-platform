@@ -17,6 +17,7 @@ from uuid import uuid4
 
 from coop_contracts.intenciones import (
     IntAmbigua,
+    IntAyuda,
     IntConsultarCaja,
     IntConsultarCuotas,
     IntConsultarSocio,
@@ -43,6 +44,7 @@ from coop_contracts.respuestas import (
 )
 
 from coop_bot.api.cliente import ApiClient, ApiError
+from coop_bot.dialogo.ayuda import texto_ayuda
 from coop_bot.dialogo.entidades import (
     SocioResuelto,
     formatear_lista_letras,
@@ -130,6 +132,9 @@ class MaquinaEstados:
             return self._quedarse_en_espera(
                 f"No me quedó claro qué operación quieres hacer. ¿Te refieres a: {opciones}?"
             )
+        if isinstance(intencion, IntAyuda):
+            self.sesion.texto_acumulado = None
+            return self._quedarse_en_espera(texto_ayuda(intencion.tema))
         if not isinstance(
             intencion,
             IntRegAporte

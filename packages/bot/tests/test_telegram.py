@@ -36,9 +36,10 @@ def _contexto(chat_data: dict | None = None) -> MagicMock:
     return context
 
 
-def _update(chat_id: int, texto: str | None = None) -> MagicMock:
+def _update(chat_id: int, texto: str | None = None, nombre: str = "Álvaro") -> MagicMock:
     update = MagicMock()
     update.effective_chat = SimpleNamespace(id=chat_id)
+    update.effective_user = SimpleNamespace(first_name=nombre)
     update.message.text = texto
     update.message.voice = None
     return update
@@ -150,3 +151,33 @@ async def test_on_text_falla_llm_responde_mensaje_generico() -> None:
     context.bot.send_message.assert_awaited_once()
     _, kwargs = context.bot.send_message.call_args
     assert "no pude interpretar" in kwargs["text"].lower()
+
+
+async def test_saludo_usa_el_nombre_del_perfil() -> None:
+    context = _contexto()
+    update = _update(OPERADOR_CHAT_ID, texto="hola", nombre="Mary")
+
+    await bot_telegram.on_text(update, context)
+
+    context.bot.send_message.assert_awaited_once()
+    _, kwargs = context.bot.send_message.call_args
+    assert "Hola Mary" in kwargs["text"]
+    # El saludo no gasta el LLM
+    context.bot_data["llm_client"].interpretar.assert_not_called()
+
+
+async def test_ayuda_credito_explica_que_necesita() -> None:
+    from coop_contracts.intenciones import IntAyuda
+
+    context = _contexto()
+    context.bot_data["llm_client"].interpretar = AsyncMock(
+        return_value=IntAyuda(intencion="ayuda", tema="credito")
+    )
+    update = _update(OPERADOR_CHAT_ID, texto="quiero hacer un crédito, ¿qué necesitas?")
+
+    await bot_telegram.on_text(update, context)
+
+    context.bot.send_message.assert_awaited_once()
+    _, kwargs = context.bot.send_message.call_args
+    assert "crédito" in kwargs["text"].lower()
+    assert "cuotas" in kwargs["text"].lower()
