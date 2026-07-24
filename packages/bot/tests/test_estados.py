@@ -11,6 +11,7 @@ from coop_contracts.intenciones import (
     IntConsultarSocio,
     IntCrearCredito,
     IntDesconocida,
+    IntDevolucionTotal,
     IntIncompleta,
     IntLiquidacionLetra,
     IntListarSocios,
@@ -101,6 +102,27 @@ async def test_crear_credito_flujo_completo(api_client: ApiClient) -> None:
     assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
     assert "Crédito creado" in respuesta.texto
     assert "Letra" in respuesta.texto
+
+
+async def test_devolucion_total_pide_confirmacion_reforzada(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    respuesta = await maquina.procesar_intencion(
+        IntDevolucionTotal(intencion="devolucion_total", socio="Carmenza Suárez")
+    )
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_CONFIRMACION
+    assert "DEVOLUCIÓN TOTAL" in respuesta.texto
+    assert "definitiva" in respuesta.texto
+
+
+async def test_devolucion_total_flujo_completo(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    await maquina.procesar_intencion(
+        IntDevolucionTotal(intencion="devolucion_total", socio="Carmenza Suárez")
+    )
+    respuesta = await maquina.recibir_confirmacion("sí")
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert "Devolución total" in respuesta.texto
+    assert "retirado" in respuesta.texto
 
 
 # ── Consultas (B-15) ──────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@ from typing import Literal
 
 from coop_core.db.connection import DbConnection
 
-TipoRecibo = Literal["aporte", "retiro", "pago", "combinado", "salario"]
+TipoRecibo = Literal["aporte", "retiro", "pago", "combinado", "salario", "devolucion_total"]
 
 
 class RecibosArchivosRepository:

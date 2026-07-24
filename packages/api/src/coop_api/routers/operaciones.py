@@ -13,6 +13,8 @@ from coop_contracts.respuestas import (
     CrearCreditoRequest,
     CrearCreditoResponse,
     CuotaAmortizacion,
+    DevolucionTotalRequest,
+    DevolucionTotalResponse,
     PagoResultItem,
     PagosRequest,
     PagosResponse,
@@ -32,6 +34,7 @@ from coop_core.repositories.socios_repo import SociosRepository
 from coop_core.services.aporte_service import AporteService
 from coop_core.services.combinado_service import CombinadoService
 from coop_core.services.credito_service import CreditoService
+from coop_core.services.devolucion_total_service import DevolucionTotalService
 from coop_core.services.pago_service import PagoService
 from coop_core.services.retiro_service import RetiroService
 from coop_core.utils.fecha import get_hoy_str
@@ -198,6 +201,46 @@ def registrar_retiro(
     recibos_wire.guardar_recibo_retiro(db, resultado, socio)
     notificaciones_wire.notificar_retiro(db, resultado, socio)
     idem.store(db, idem_key, "POST /operaciones/retiros", payload_json, resp.model_dump())
+    db.commit()
+    return resp
+
+
+@router.post("/devoluciones-totales", status_code=201, response_model=None)
+def registrar_devolucion_total(
+    body: DevolucionTotalRequest,
+    db: DbDep,
+    _auth: AuthDep,
+    idempotency_key: IdempDep = None,  # type: ignore[assignment]
+) -> DevolucionTotalResponse | JSONResponse:
+    idem_key = _require_idem(idempotency_key)
+    payload_json = body.model_dump_json()
+    try:
+        cached = idem.check(db, idem_key, "POST /operaciones/devoluciones-totales", payload_json)
+    except ValueError:
+        return value_error_to_response(ValueError("IDEMPOTENCY_CONFLICT"))
+    if cached:
+        return DevolucionTotalResponse.model_validate(cached)
+
+    socios_repo = SociosRepository(db)
+    socio = _get_socio_or_404(socios_repo, body.socio_id)
+
+    svc = DevolucionTotalService(
+        db, ConfigRepository(db), AuxiliarRepository(db), socios_repo, CreditosRepository(db)
+    )
+    try:
+        resultado = svc.register(socio)
+    except ValueError as exc:
+        return value_error_to_response(exc)
+
+    resp = DevolucionTotalResponse(
+        recibo_id=resultado["recibo_id"],
+        fecha=resultado["fecha"],
+        socio=_socio_ref(socio),
+        monto_devuelto=resultado["monto"],
+        saldo_caja_nuevo=resultado["nuevo_saldo_caja"],
+    )
+    recibos_wire.guardar_recibo_devolucion_total(db, resultado, socio)
+    idem.store(db, idem_key, "POST /operaciones/devoluciones-totales", payload_json, resp.model_dump())
     db.commit()
     return resp
 

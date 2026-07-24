@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS socios (
     familia_id  INTEGER,
     whatsapp_e164       TEXT,
     optin_whatsapp_fecha TEXT,
+    activo      INTEGER DEFAULT 1,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -165,4 +166,5 @@ MIGRATIONS_POSTGRES: tuple[str, ...] = (
     "ALTER TABLE notificaciones_whatsapp ADD COLUMN IF NOT EXISTS documento_tipo TEXT",
     "ALTER TABLE notificaciones_whatsapp ADD COLUMN IF NOT EXISTS documento_id INTEGER",
     "ALTER TABLE notificaciones_whatsapp ADD COLUMN IF NOT EXISTS detalle TEXT",
+    "ALTER TABLE socios ADD COLUMN IF NOT EXISTS activo INTEGER DEFAULT 1",
 )

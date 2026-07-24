@@ -17,6 +17,8 @@ from coop_contracts.respuestas import (
     CreditoDetalle,
     CreditosResponse,
     CuotasPendientesResponse,
+    DevolucionTotalRequest,
+    DevolucionTotalResponse,
     FamiliaResponse,
     NotificacionesPendientesResponse,
     PagosRequest,
@@ -146,6 +148,13 @@ class ApiClient:
 
     async def registrar_retiro(self, body: RetirosRequest, idempotency_key: str) -> RetiroResponse:
         return await self._post("/operaciones/retiros", body, idempotency_key, RetiroResponse)
+
+    async def registrar_devolucion_total(
+        self, body: DevolucionTotalRequest, idempotency_key: str
+    ) -> DevolucionTotalResponse:
+        return await self._post(
+            "/operaciones/devoluciones-totales", body, idempotency_key, DevolucionTotalResponse
+        )
 
     async def registrar_pagos(self, body: PagosRequest, idempotency_key: str) -> PagosResponse:
         return await self._post("/operaciones/pagos", body, idempotency_key, PagosResponse)

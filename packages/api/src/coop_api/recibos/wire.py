@@ -149,6 +149,22 @@ def guardar_recibo_retiro(
     _persistir(db, datos.recibo_id, "retiro", xlsx)
 
 
+def guardar_recibo_devolucion_total(
+    db: DbConnection,
+    resultado: dict[str, Any],
+    socio: dict[str, Any],
+) -> None:
+    datos = DatosRecibo(
+        recibo_id=int(resultado["recibo_id"]),
+        fecha=_a_date(resultado["fecha"]),
+        recibi_de=_socio(socio),
+        socio_retiro=_socio(socio),
+        monto_retiro=int(resultado["monto"]),
+    )
+    xlsx = generador.generar_xlsx_devolucion_total(datos)
+    _persistir(db, datos.recibo_id, "devolucion_total", xlsx)
+
+
 def guardar_recibo_pago(
     db: DbConnection,
     resultado: dict[str, Any],

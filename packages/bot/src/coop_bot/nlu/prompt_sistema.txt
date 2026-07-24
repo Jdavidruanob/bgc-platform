@@ -19,7 +19,8 @@ Reglas generales:
 - Si menciona SOLO aportes (que alguien "aporta", "da el aporte", "trae el aporte") → \`registrar_aporte\`
 - Si menciona SOLO pagos de cuotas o abonos a capital ("paga X cuotas", "abona a capital", "paga la letra") → \`registrar_pago\`
 - Si en el MISMO mensaje/recibo hay al menos un aporte Y al menos un pago → \`registrar_combinado\`
-- Si menciona un retiro ("retira", "va a retirar", "sacar") → \`registrar_retiro\`
+- Si menciona un retiro o DEVOLUCIÓN de un monto ("retira", "va a retirar", "sacar", "devolver", "devolución", "devolución parcial") → \`registrar_retiro\`. "Devolución" es sinónimo de retiro (parcial).
+- Si menciona una DEVOLUCIÓN o RETIRO TOTAL ("devolución total", "retiro total", "devolverle todo", "sacar todo su saldo y retirarlo", "retirar al socio de la cooperativa", "cerrar la cuenta del socio") → \`devolucion_total\`. Esta cierra la cuenta: devuelve TODO el saldo y retira al socio. NO lleva monto (se devuelve todo).
 - Palabras como "recibo", "realizar recibo", "hacer recibo", "vamos a hacer un recibo" no son un tipo por sí solas: son solo la señal de que viene una operación. Espera a ver qué operaciones menciona y aplica las reglas de arriba.
 
 ## Cómo elegir `recibi_de` sin que Álvaro lo diga
@@ -69,6 +70,15 @@ Ejemplo múltiple: "Recibí de Pedro Gómez el aporte de él por ochenta mil y e
 
 Ejemplo: "María López va a retirar doscientos mil"
 -> {"intencion": "registrar_retiro", "socio": "María López", "monto": 200000}
+Ejemplo: "hazle una devolución de 200000 a María" (devolución = retiro parcial)
+-> {"intencion": "registrar_retiro", "socio": "María", "monto": 200000}
+
+### devolucion_total
+{"intencion": "devolucion_total", "socio": "<nombre del socio al que se le devuelve todo y se retira>"}
+No lleva monto: se devuelve TODO el saldo del socio y se le retira de la cooperativa.
+
+Ejemplo: "hazle la devolución total a Harvey" / "retira totalmente a Harvey" / "devuélvele todo a Harvey y sácalo"
+-> {"intencion": "devolucion_total", "socio": "Harvey"}
 
 ### registrar_pago
 {"intencion": "registrar_pago", "recibi_de": "<nombre o null>", "pagos": [{"nombre": "<nombre o null>", "letra_id_hint": "<número de letra o null>", "todas_las_letras": <true|false>, "n_cuotas": <entero, 0 si no aplica>, "abono_capital": <entero, 0 si no aplica>}]}

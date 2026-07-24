@@ -238,6 +238,28 @@ def generar_xlsx_retiro(datos: DatosRecibo) -> bytes:
     return _guardar(wb)
 
 
+def generar_xlsx_devolucion_total(datos: DatosRecibo) -> bytes:
+    """Recibo de devolución/retiro TOTAL. Mapeo de celdas del template
+    'devolucion-total.xlsx': B5=recibo, F5=valor, B7=fecha, B9=socio."""
+    if datos.socio_retiro is None or datos.monto_retiro is None:
+        raise ValueError("Recibo de devolución total necesita socio_retiro y monto_retiro")
+
+    wb = _abrir_plantilla("recibo_template_devolucion_total.xlsx")
+    ws = wb.active
+    socio = datos.socio_retiro
+
+    ws["B5"] = datos.recibo_id
+    ws["F5"] = format_miles_colombian_int(datos.monto_retiro)
+    ws["B7"] = datos.fecha.strftime("%d/%m/%Y")
+    ws["B9"] = f"{socio.nombres} {socio.apellidos}".upper()
+
+    # Plantilla vertical y compacta: tamaño carta y ajuste a una página para que
+    # no se corte al convertir a PDF.
+    _configurar_pagina(ws, horizontal=False, tamano_carta=True)
+
+    return _guardar(wb)
+
+
 def generar_xlsx_combinado(datos: DatosRecibo) -> bytes:
     aportes = datos.aportes[:_MAX_FILAS]
     pagos = datos.pagos[:_MAX_FILAS]

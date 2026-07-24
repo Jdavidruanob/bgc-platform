@@ -24,6 +24,10 @@ class RetirosRequest(BaseModel):
     monto: Annotated[int, Field(gt=0)]
 
 
+class DevolucionTotalRequest(BaseModel):
+    socio_id: int
+
+
 class PagoReqItem(BaseModel):
     socio_id: int
     letra_id: int
@@ -184,6 +188,14 @@ class RetiroResponse(BaseModel):
     monto_retirado: int
     saldo_anterior: int
     saldo_nuevo: int
+    saldo_caja_nuevo: int
+
+
+class DevolucionTotalResponse(BaseModel):
+    recibo_id: int
+    fecha: str
+    socio: SocioRef
+    monto_devuelto: int
     saldo_caja_nuevo: int
 
 

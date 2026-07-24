@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS socios (
     familia_id INTEGER,
     whatsapp_e164 TEXT,
     optin_whatsapp_fecha TEXT,
+    activo INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

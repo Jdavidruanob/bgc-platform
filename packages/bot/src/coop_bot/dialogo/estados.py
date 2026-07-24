@@ -26,6 +26,7 @@ from coop_contracts.intenciones import (
     IntConsultarSocio,
     IntCrearCredito,
     IntDesconocida,
+    IntDevolucionTotal,
     Intencion,
     IntIncompleta,
     IntLiquidacionLetra,
@@ -44,6 +45,7 @@ from coop_contracts.respuestas import (
     CombinadosRequest,
     CrearCreditoRequest,
     CreditoResumen,
+    DevolucionTotalRequest,
     PagoReqItem,
     PagosRequest,
     RetirosRequest,
@@ -215,6 +217,7 @@ class MaquinaEstados:
             intencion,
             IntRegAporte
             | IntRegRetiro
+            | IntDevolucionTotal
             | IntRegPago
             | IntRegCombinado
             | IntCrearCredito
@@ -288,9 +291,12 @@ class MaquinaEstados:
             self.sesion.idempotency_key = str(uuid4())
 
         es_credito = isinstance(self.sesion.intencion, IntCrearCredito)
+        es_devolucion_total = isinstance(self.sesion.intencion, IntDevolucionTotal)
         try:
             if es_credito:
                 texto_ok, pdf_bytes, nombre_pdf = await self._ejecutar_crear_credito()
+            elif es_devolucion_total:
+                texto_ok, pdf_bytes, nombre_pdf = await self._ejecutar_devolucion_total()
             else:
                 texto_ok = "Listo, aquí está tu comprobante."
                 pdf_bytes, nombre_pdf = await self._ejecutar_operacion()
@@ -390,6 +396,10 @@ class MaquinaEstados:
         # Crear crédito: la confirmación muestra la letra que tomaría.
         if isinstance(intencion, IntCrearCredito):
             return await self._construir_confirmacion_credito(intencion)
+        # Devolución total: cierra la cuenta del socio, va por su cuenta y con
+        # una confirmación reforzada (es irreversible).
+        if isinstance(intencion, IntDevolucionTotal):
+            return self._construir_confirmacion_devolucion_total(intencion)
         # Retiro va por su cuenta (no se combina).
         if isinstance(intencion, IntRegRetiro):
             return self._construir_confirmacion()
@@ -518,6 +528,18 @@ class MaquinaEstados:
     def _construir_confirmacion(self) -> RespuestaDialogo:
         assert self.sesion.intencion is not None
         texto = construir_resumen(self.sesion.intencion, self.sesion.socios, self.sesion.letras)
+        self.sesion.resumen_texto = texto
+        self.sesion.estado = EstadoDialogo.ESPERANDO_CONFIRMACION
+        return RespuestaDialogo(texto=texto, requiere_timeout=True)
+
+    def _construir_confirmacion_devolucion_total(self, intencion: IntDevolucionTotal) -> RespuestaDialogo:
+        socio = self.sesion.socios[intencion.socio]
+        texto = (
+            f"⚠️ DEVOLUCIÓN TOTAL de {socio.nombre_completo}.\n"
+            "Esto le devuelve TODO su saldo, lo descuenta de la caja y RETIRA al socio "
+            "de la cooperativa (deja de aparecer en la app y el bot).\n"
+            "Es una operación definitiva. ¿Confirmo? Responde «sí» para continuar."
+        )
         self.sesion.resumen_texto = texto
         self.sesion.estado = EstadoDialogo.ESPERANDO_CONFIRMACION
         return RespuestaDialogo(texto=texto, requiere_timeout=True)
@@ -772,6 +794,25 @@ class MaquinaEstados:
         self.sesion.ultimo_documento = DocumentoReciente(tipo="liquidacion_credito", id=resp.letra_id)
         return texto, pdf_bytes, nombre_pdf
 
+    async def _ejecutar_devolucion_total(self) -> tuple[str, bytes | None, str | None]:
+        intencion = self.sesion.intencion
+        key = self.sesion.idempotency_key
+        assert isinstance(intencion, IntDevolucionTotal)
+        assert key is not None
+
+        socio = self.sesion.socios[intencion.socio]
+        resp = await self.cliente.registrar_devolucion_total(DevolucionTotalRequest(socio_id=socio.id), key)
+        texto = (
+            f"Devolución total de {socio.nombre_completo}: "
+            f"{formatear_monto(resp.monto_devuelto)} devueltos.\n"
+            f"El socio fue retirado de la cooperativa.\n"
+            f"Saldo en caja: {formatear_monto(resp.saldo_caja_nuevo)}"
+        )
+        pdf_bytes = await self.cliente.descargar_pdf_recibo(resp.recibo_id)
+        nombre_pdf = f"Devolucion_total_{resp.recibo_id}.pdf" if pdf_bytes is not None else None
+        self.sesion.ultimo_documento = DocumentoReciente(tipo="recibo", id=resp.recibo_id)
+        return texto, pdf_bytes, nombre_pdf
+
     # ── Salario ──────────────────────────────────────────────────────────────
 
     async def _preparar_salario(self, intencion: IntPagoSalario) -> RespuestaDialogo:
@@ -850,7 +891,7 @@ def _partes_registro(
 
 def _nombres_socios(intencion: Intencion) -> list[str]:
     nombres: list[str] = []
-    if isinstance(intencion, IntRegRetiro):
+    if isinstance(intencion, IntRegRetiro | IntDevolucionTotal):
         nombres.append(intencion.socio)
     elif isinstance(intencion, IntRegAporte | IntRegPago | IntRegCombinado):
         aportes, pagos, recibi_de = _partes_registro(intencion)

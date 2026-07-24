@@ -60,6 +60,11 @@ class IntRegRetiro(BaseModel):
     monto: Annotated[int, Field(gt=0)]
 
 
+class IntDevolucionTotal(BaseModel):
+    intencion: Literal["devolucion_total"]
+    socio: str = Field(..., description="Nombre del socio al que se le devuelve todo y se retira")
+
+
 class IntRegPago(BaseModel):
     intencion: Literal["registrar_pago"]
     # Opcional: con letra basta. Si no se dice, es el titular de la primera letra.
@@ -167,6 +172,7 @@ class IntAmbigua(BaseModel):
 Intencion = (
     IntRegAporte
     | IntRegRetiro
+    | IntDevolucionTotal
     | IntRegPago
     | IntRegCombinado
     | IntCrearCredito

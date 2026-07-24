@@ -37,6 +37,7 @@ class SociosRepository:
                    COUNT(sc.credito_letra) AS creditos
             FROM socios s
             LEFT JOIN socio_credito sc ON s.id = sc.socio_id
+            WHERE COALESCE(s.activo, 1) = 1
             GROUP BY s.id
             ORDER BY s.nombres
         """)
@@ -48,6 +49,7 @@ class SociosRepository:
             SELECT s.*, COUNT(sc.credito_letra) AS creditos
             FROM socios s
             LEFT JOIN socio_credito sc ON s.id = sc.socio_id
+            WHERE COALESCE(s.activo, 1) = 1
             GROUP BY s.id
             ORDER BY s.nombres
         """)
@@ -77,7 +79,8 @@ class SociosRepository:
                    COUNT(sc.credito_letra) AS creditos
             FROM socios s
             LEFT JOIN socio_credito sc ON s.id = sc.socio_id
-            WHERE s.nombres LIKE %s OR s.apellidos LIKE %s
+            WHERE (s.nombres LIKE %s OR s.apellidos LIKE %s)
+              AND COALESCE(s.activo, 1) = 1
             GROUP BY s.id
             ORDER BY s.nombres
             """,
@@ -133,3 +136,10 @@ class SociosRepository:
             """,
             (nombres, apellidos, phone, photo_path, nuevo_saldo, socio_id),
         )
+
+    def deactivate(self, socio_id: int) -> None:
+        """Retira al socio (soft-delete): lo marca inactivo y le deja el saldo
+        en 0. Conserva la fila y todo su historial (recibos, movimientos), pero
+        deja de aparecer en listados y búsquedas."""
+        cursor = self._conn.cursor()
+        cursor.execute("UPDATE socios SET activo = 0, saldo = 0 WHERE id = %s", (socio_id,))

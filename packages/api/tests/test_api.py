@@ -141,6 +141,41 @@ def test_creditos_socio_excluye_credito_saldado(client: TestClient, credito_pedr
     assert r2.json()["creditos"] == []
 
 
+# ── POST /operaciones/devoluciones-totales ────────────────────────────────────
+
+
+def _set_caja(db_conn, monto: int) -> None:
+    from coop_core.repositories.config_repo import ConfigRepository
+
+    ConfigRepository(db_conn).set("saldo_en_caja", str(monto))
+    db_conn.commit()
+
+
+def test_devolucion_total_exitosa(client: TestClient, db_conn, socio_pedro):
+    _set_caja(db_conn, 500000)
+    r = client.post("/operaciones/devoluciones-totales", json={"socio_id": socio_pedro}, headers=_idem())
+    assert r.status_code == 201
+    data = r.json()
+    assert data["monto_devuelto"] == 320000
+    assert data["saldo_caja_nuevo"] == 180000
+    # El socio queda retirado: ya no aparece en la búsqueda.
+    r2 = client.get("/socios", params={"q": "Pedro"}, headers=AUTH)
+    assert r2.json()["socios"] == []
+
+
+def test_devolucion_total_bloquea_con_credito_activo(client: TestClient, db_conn, socio_pedro, credito_pedro):
+    _set_caja(db_conn, 500000)
+    r = client.post("/operaciones/devoluciones-totales", json={"socio_id": socio_pedro}, headers=_idem())
+    assert r.status_code == 422
+    assert "activos" in r.json()["error"]["mensaje"]
+
+
+def test_devolucion_total_bloquea_si_caja_no_alcanza(client: TestClient, db_conn, socio_pedro):
+    _set_caja(db_conn, 100000)  # menos que el saldo del socio (320000)
+    r = client.post("/operaciones/devoluciones-totales", json={"socio_id": socio_pedro}, headers=_idem())
+    assert r.status_code == 422
+
+
 # ── Caja ──────────────────────────────────────────────────────────────────────
 
 

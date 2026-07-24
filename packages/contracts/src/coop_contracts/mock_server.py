@@ -31,6 +31,8 @@ from coop_contracts.respuestas import (
     CuotaAmortizacion,
     CuotaPendiente,
     CuotasPendientesResponse,
+    DevolucionTotalRequest,
+    DevolucionTotalResponse,
     ErrorDetail,
     ErrorResponse,
     FamiliaResponse,
@@ -461,6 +463,45 @@ def registrar_retiro(
         monto_retirado=body.monto,
         saldo_anterior=saldo_ant,
         saldo_nuevo=s["saldo"],
+        saldo_caja_nuevo=_state["caja"]["saldo_en_caja"],
+    )
+    _store_idempotency(idem_key, payload_hash, resp.model_dump())
+    return resp
+
+
+@app.post("/operaciones/devoluciones-totales", status_code=201)
+def registrar_devolucion_total(
+    body: DevolucionTotalRequest,
+    _auth: AuthDep = None,
+    idem_key: IdempDep = None,
+) -> DevolucionTotalResponse:
+    payload_hash = hash(body.model_dump_json())
+    cached = _check_idempotency(idem_key, payload_hash)
+    if cached:
+        return DevolucionTotalResponse(**cached)
+
+    s = _find_socio(body.socio_id)
+    if s["saldo"] <= 0:
+        raise HTTPException(
+            status_code=422,
+            detail=ErrorResponse(
+                error=ErrorDetail(
+                    codigo="SIN_SALDO",
+                    mensaje="El socio no tiene saldo para devolver.",
+                )
+            ).model_dump(),
+        )
+
+    monto = s["saldo"]
+    s["saldo"] = 0
+    s["activo"] = 0
+    _state["caja"]["saldo_en_caja"] -= monto
+
+    resp = DevolucionTotalResponse(
+        recibo_id=_next_recibo(),
+        fecha=_today(),
+        socio=SocioRef(id=s["id"], nombre_completo=make_nombre_completo(s)),
+        monto_devuelto=monto,
         saldo_caja_nuevo=_state["caja"]["saldo_en_caja"],
     )
     _store_idempotency(idem_key, payload_hash, resp.model_dump())
