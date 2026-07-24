@@ -565,17 +565,35 @@ def test_socio_sin_telefono_no_encola_notificacion(client: TestClient, db_conn):
     assert notifs == []
 
 
-def test_crear_credito_encola_notificacion_sin_documento(client: TestClient, socio_pedro):
+def test_crear_credito_encola_notificacion_con_liquidacion(client: TestClient, socio_pedro):
+    """El crédito no genera recibo, pero sí liquidación: el socio la recibe adjunta."""
     r = client.post(
         "/operaciones/creditos",
         json={"socio_ids": [socio_pedro], "capital": 600000, "n_cuotas": 6},
         headers=_idem(),
     )
     assert r.status_code == 201
+    letra_id = r.json()["letra_id"]
     notifs = client.get("/notificaciones/pendientes", headers=AUTH).json()["notificaciones"]
     assert len(notifs) == 1
-    assert notifs[0]["documento_tipo"] is None
+    assert notifs[0]["documento_tipo"] == "liquidacion"
+    assert notifs[0]["documento_id"] == letra_id
     assert "aprobado" in notifs[0]["texto"].lower()
+
+
+def test_notificacion_saluda_por_nombre_y_trae_nombre_del_socio(client: TestClient, socio_pedro):
+    """El mensaje al socio abre con un saludo por su nombre de pila, y la cola
+    expone el nombre completo para poder avisarle al operador quién recibió."""
+    r = client.post(
+        "/operaciones/aportes",
+        json={"recibi_de_id": socio_pedro, "aportes": [{"socio_id": socio_pedro, "monto": 50000}]},
+        headers=_idem(),
+    )
+    assert r.status_code == 201
+    notifs = client.get("/notificaciones/pendientes", headers=AUTH).json()["notificaciones"]
+    assert len(notifs) == 1
+    assert notifs[0]["texto"].startswith("Hola Pedro")
+    assert "Pedro" in notifs[0]["socio_nombre"]
 
 
 # ── Fuzzy search unitario ─────────────────────────────────────────────────────

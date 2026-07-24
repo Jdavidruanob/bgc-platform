@@ -17,11 +17,23 @@ from coop_core.repositories.socios_repo import SociosRepository
 from coop_core.utils.formato import format_miles_colombian_int
 from coop_core.utils.telefono import derivar_whatsapp_e164
 
-_FIRMA = "— Cooperativa BGC"
+_FIRMA = "Cooperativa BGC\n¡Gracias por tu confianza!"
 
 
 def _monto(valor: int) -> str:
     return f"${format_miles_colombian_int(valor)}"
+
+
+def _primer_nombre(nombres: Any) -> str:
+    """'Pedro Antonio' → 'Pedro'. El saludo suena más natural con un solo
+    nombre; si viene vacío se saluda sin nombre."""
+    partes = str(nombres or "").strip().split()
+    return partes[0].capitalize() if partes else ""
+
+
+def _mensaje(nombres: Any, cuerpo: str, cierre: str) -> str:
+    saludo = f"Hola {_primer_nombre(nombres)} 👋" if _primer_nombre(nombres) else "Hola 👋"
+    return f"{saludo}\n\n{cuerpo}\n\n{cierre}\n\n{_FIRMA}"
 
 
 def _numero_de(socio: dict[str, Any]) -> str | None:
@@ -51,24 +63,31 @@ def _encolar(
     repo.create(socio_id, numero, texto, documento_tipo, documento_id)
 
 
+def _texto_aporte(a: dict[str, Any]) -> str:
+    return _mensaje(
+        a["nombres"],
+        f"Registramos tu aporte de *{_monto(int(a['monto']))}*.\n"
+        f"Tu nuevo saldo es *{_monto(int(a['saldo_nuevo']))}*.",
+        "Te adjuntamos el comprobante de la operación.",
+    )
+
+
 def notificar_aportes(db: DbConnection, resultado: dict[str, Any]) -> None:
     repo = NotificacionesRepository(db)
     recibo_id = int(resultado["recibo_id"])
     for a in resultado["aportes"]:
         socio_id = int(a["socio_id"])
-        texto = (
-            f"Hola {a['nombres']}, registramos tu aporte de {_monto(int(a['monto']))}. "
-            f"Tu nuevo saldo es {_monto(int(a['saldo_nuevo']))}. {_FIRMA}"
-        )
-        _encolar(repo, socio_id, _socio_por_id(db, socio_id), texto, "recibo", recibo_id)
+        _encolar(repo, socio_id, _socio_por_id(db, socio_id), _texto_aporte(a), "recibo", recibo_id)
 
 
 def notificar_retiro(db: DbConnection, resultado: dict[str, Any], socio: dict[str, Any]) -> None:
     repo = NotificacionesRepository(db)
     recibo_id = int(resultado["recibo_id"])
-    texto = (
-        f"Hola {socio['nombres']}, registramos tu retiro de {_monto(int(resultado['monto']))}. "
-        f"Tu nuevo saldo es {_monto(int(resultado['saldo_nuevo']))}. {_FIRMA}"
+    texto = _mensaje(
+        socio["nombres"],
+        f"Registramos tu retiro de *{_monto(int(resultado['monto']))}*.\n"
+        f"Tu nuevo saldo es *{_monto(int(resultado['saldo_nuevo']))}*.",
+        "Te adjuntamos el comprobante de la operación.",
     )
     _encolar(repo, int(socio["id"]), socio, texto, "recibo", recibo_id)
 
@@ -81,13 +100,16 @@ def _texto_pago(p: dict[str, Any]) -> str:
         + int(p["interes_consolidado"])
         + int(p.get("mora_consolidada", 0))
     )
-    if cuotas:
-        detalle = f"{len(cuotas)} cuota(s)" if len(cuotas) > 1 else "1 cuota"
-    else:
+    if not cuotas:
         detalle = "un abono a capital"
-    return (
-        f"Hola {p['nombres']}, registramos el pago de {detalle} de tu crédito "
-        f"(letra {letra_id}) por {_monto(total)}. {_FIRMA}"
+    elif len(cuotas) > 1:
+        detalle = f"{len(cuotas)} cuotas"
+    else:
+        detalle = "1 cuota"
+    return _mensaje(
+        p["nombres"],
+        f"Registramos el pago de {detalle} de tu crédito (letra {letra_id}) por *{_monto(total)}*.",
+        "Te adjuntamos el comprobante de la operación.",
     )
 
 
@@ -104,25 +126,23 @@ def notificar_combinado(db: DbConnection, resultado: dict[str, Any]) -> None:
     recibo_id = int(resultado["recibo_id"])
     for a in resultado["aportes"]:
         socio_id = int(a["socio_id"])
-        texto = (
-            f"Hola {a['nombres']}, registramos tu aporte de {_monto(int(a['monto']))}. "
-            f"Tu nuevo saldo es {_monto(int(a['saldo_nuevo']))}. {_FIRMA}"
-        )
-        _encolar(repo, socio_id, _socio_por_id(db, socio_id), texto, "recibo", recibo_id)
+        _encolar(repo, socio_id, _socio_por_id(db, socio_id), _texto_aporte(a), "recibo", recibo_id)
     for p in resultado["pagos"]:
         socio_id = int(p["socio_id"])
         _encolar(repo, socio_id, _socio_por_id(db, socio_id), _texto_pago(p), "recibo", recibo_id)
 
 
 def notificar_credito_nuevo(db: DbConnection, resultado: dict[str, Any]) -> None:
-    """El crédito no genera fila en `recibos` (solo créditos/liquidaciones), así
-    que esta notificación va sin documento adjunto: solo texto."""
+    """El crédito no genera fila en `recibos`, pero sí una liquidación: se
+    adjunta esa (documento_tipo='liquidacion', documento_id=letra_id)."""
     repo = NotificacionesRepository(db)
     letra_id = int(resultado["letra_id"])
     for s in resultado["socios"]:
         socio_id = int(s["id"])
-        texto = (
-            f"Hola {s['nombres']}, tu crédito por {_monto(int(resultado['capital']))} a "
-            f"{int(resultado['n_cuotas'])} cuotas fue aprobado (letra {letra_id}). {_FIRMA}"
+        texto = _mensaje(
+            s["nombres"],
+            f"¡Buenas noticias! Tu crédito por *{_monto(int(resultado['capital']))}* "
+            f"a {int(resultado['n_cuotas'])} cuotas fue aprobado (letra {letra_id}).",
+            "Te adjuntamos la liquidación con el plan de pagos.",
         )
-        _encolar(repo, socio_id, _socio_por_id(db, socio_id), texto)
+        _encolar(repo, socio_id, _socio_por_id(db, socio_id), texto, "liquidacion", letra_id)

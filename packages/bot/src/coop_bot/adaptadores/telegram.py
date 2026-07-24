@@ -27,7 +27,7 @@ from coop_bot.dialogo.estados import (
 )
 from coop_bot.nlu.llm_client import LlmClient
 from coop_bot.nlu.whisper_client import WhisperClient
-from coop_bot.notificaciones.procesador import procesar_pendientes
+from coop_bot.notificaciones.procesador import ResumenProcesamiento, procesar_pendientes
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +123,39 @@ async def _on_procesar_notificaciones(context: ContextTypes.DEFAULT_TYPE) -> Non
         )
     for error in resumen.errores:
         logger.warning("Error procesando la cola de notificaciones: %s", error)
+
+    aviso = _texto_aviso_operador(resumen)
+    if aviso:
+        for chat_id in _config(context).telegram_operador_chat_ids:
+            await enviar_texto(context, chat_id, aviso)
+
+
+def _texto_aviso_operador(resumen: ResumenProcesamiento) -> str:
+    """Le cuenta al operador qué pasó con los comprobantes que salieron para
+    los socios. Vacío si no hubo nada que reportar."""
+    lineas: list[str] = []
+
+    entregados = [e.socio_nombre for e in resumen.envios if e.entregado]
+    if entregados:
+        lineas.append("✅ Ya recibieron su comprobante por WhatsApp:")
+        lineas += [f"• {nombre}" for nombre in entregados]
+
+    # El fallback wa.me no envía nada por sí solo: genera un link que alguien
+    # tiene que abrir. Se reporta aparte para no dar por entregado lo que no lo está.
+    pendientes_manuales = [e for e in resumen.envios if not e.entregado]
+    if pendientes_manuales:
+        if lineas:
+            lineas.append("")
+        lineas.append("📎 Estos quedaron listos para enviar a mano (ábrele el link):")
+        lineas += [f"• {e.socio_nombre}: {e.wa_me_url}" for e in pendientes_manuales]
+
+    if resumen.fallos:
+        if lineas:
+            lineas.append("")
+        lineas.append("⚠️ No pude enviarle el comprobante a:")
+        lineas += [f"• {nombre} ({error or 'error desconocido'})" for nombre, error in resumen.fallos]
+
+    return "\n".join(lineas)
 
 
 # ── Handlers ─────────────────────────────────────────────────────────────────

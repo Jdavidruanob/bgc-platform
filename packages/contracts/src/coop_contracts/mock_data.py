@@ -122,6 +122,7 @@ NOTIFICACIONES_INICIALES: list[dict] = [
         "texto": "Estimada María López, su aporte de $250.000 fue registrado el 2026-07-20. Gracias.",
         "estado": "pendiente",
         "fecha_creacion": "2026-07-20T10:00:00",
+        "socio_nombre": "María López Herrera",
     }
 ]
 

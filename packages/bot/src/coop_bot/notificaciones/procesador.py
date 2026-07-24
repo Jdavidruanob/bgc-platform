@@ -22,10 +22,27 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class EnvioRealizado:
+    """Un envío que salió bien. `canal` distingue el envío real por WhatsApp
+    ('cloud_api') del fallback que solo genera un link ('wa_me_link'): en ese
+    segundo caso el socio TODAVÍA no recibió nada, hay que abrir el link."""
+
+    socio_nombre: str
+    canal: str
+    wa_me_url: str | None = None
+
+    @property
+    def entregado(self) -> bool:
+        return self.canal != "wa_me_link"
+
+
+@dataclass
 class ResumenProcesamiento:
     enviadas: int = 0
     fallidas: int = 0
     errores: list[str] = field(default_factory=list)
+    envios: list[EnvioRealizado] = field(default_factory=list)
+    fallos: list[tuple[str, str | None]] = field(default_factory=list)
 
 
 async def procesar_pendientes(cliente: ApiClient, notificador: Notificador) -> ResumenProcesamiento:
@@ -67,12 +84,21 @@ async def _procesar_una(
             )
     except Exception as exc:  # noqa: BLE001 - cualquier fallo del canal es recuperable
         logger.exception("El notificador lanzó una excepción para la notificación %s", notificacion.id)
+        resumen.fallos.append((notificacion.socio_nombre, str(exc)))
         await _marcar(cliente, notificacion.id, "fallida", str(exc), resumen)
         return
 
     if resultado.exitoso:
+        resumen.envios.append(
+            EnvioRealizado(
+                socio_nombre=notificacion.socio_nombre,
+                canal=resultado.canal,
+                wa_me_url=resultado.wa_me_url,
+            )
+        )
         await _marcar(cliente, notificacion.id, "enviada", None, resumen)
     else:
+        resumen.fallos.append((notificacion.socio_nombre, resultado.error))
         await _marcar(cliente, notificacion.id, "fallida", resultado.error, resumen)
 
 

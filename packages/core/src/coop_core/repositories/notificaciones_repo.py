@@ -31,10 +31,13 @@ class NotificacionesRepository:
         cursor = self._conn.cursor()
         cursor.execute(
             """
-            SELECT id, socio_id, numero_e164, texto, created_at, documento_tipo, documento_id
-            FROM notificaciones_whatsapp
-            WHERE estado = 'pendiente'
-            ORDER BY created_at ASC
+            SELECT n.id, n.socio_id, n.numero_e164, n.texto, n.created_at,
+                   n.documento_tipo, n.documento_id,
+                   s.nombres, s.apellidos
+            FROM notificaciones_whatsapp n
+            JOIN socios s ON s.id = n.socio_id
+            WHERE n.estado = 'pendiente'
+            ORDER BY n.created_at ASC
             """,
         )
         cols = [d[0] for d in cursor.description]
