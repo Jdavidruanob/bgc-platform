@@ -120,6 +120,27 @@ def test_get_creditos_socio(client: TestClient, credito_pedro, socio_pedro):
     assert creditos[0]["letra_id"] == credito_pedro
 
 
+def test_creditos_socio_excluye_credito_saldado(client: TestClient, credito_pedro, socio_pedro):
+    """Al pagar todas las cuotas, el crédito queda saldado y ya no aparece como
+    activo del socio, para que no estorbe al operar (no más 'esa letra ya está
+    pagada')."""
+    r = client.post(
+        "/operaciones/pagos",
+        json={
+            "recibi_de_id": socio_pedro,
+            "pagos": [
+                {"socio_id": socio_pedro, "letra_id": credito_pedro, "n_cuotas": 12, "abono_capital": 0}
+            ],
+        },
+        headers=_idem(),
+    )
+    assert r.status_code == 201
+
+    r2 = client.get(f"/socios/{socio_pedro}/creditos", headers=AUTH)
+    assert r2.status_code == 200
+    assert r2.json()["creditos"] == []
+
+
 # ── Caja ──────────────────────────────────────────────────────────────────────
 
 

@@ -109,6 +109,35 @@ def test_creditos_find_active_no_creditos(repos: dict[str, Any]) -> None:
     assert repos["creditos"].find_active_by_socio_id(sid) == []
 
 
+def _marcar_credito_saldado(repos: dict[str, Any], letra: int) -> None:
+    """Marca TODAS las cuotas del crédito como cobradas (fecha_pago)."""
+    cursor = repos["conn"].cursor()
+    cursor.execute(
+        "UPDATE liquidaciones SET fecha_pago = %s WHERE credito_letra = %s",
+        ("2024-06-01", letra),
+    )
+    repos["conn"].commit()
+
+
+def test_creditos_find_active_excluye_credito_saldado(repos: dict[str, Any]) -> None:
+    """Un crédito totalmente cobrado no debe aparecer como activo (evita el
+    'esa letra ya está pagada' al operar sobre el socio)."""
+    sid = _insert_socio(repos, "Harvey", "Ramos")
+    letra = _insert_credito_completo(repos, sid)
+    _marcar_credito_saldado(repos, letra)
+    assert repos["creditos"].find_active_by_socio_id(sid) == []
+
+
+def test_creditos_find_active_mezcla_activo_y_saldado(repos: dict[str, Any]) -> None:
+    """Con un crédito saldado y otro con cuotas pendientes, solo vuelve el activo."""
+    sid = _insert_socio(repos, "Harvey", "Ramos")
+    saldado = _insert_credito_completo(repos, sid, 400_000, 4)
+    activo = _insert_credito_completo(repos, sid, 900_000, 9)
+    _marcar_credito_saldado(repos, saldado)
+    creditos = repos["creditos"].find_active_by_socio_id(sid)
+    assert [c["letra"] for c in creditos] == [activo]
+
+
 def test_creditos_get_socio_ids(repos: dict[str, Any]) -> None:
     s1 = _insert_socio(repos, "A", "B")
     s2 = _insert_socio(repos, "C", "D")

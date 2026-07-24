@@ -75,6 +75,11 @@ class CreditosRepository:
         return credito
 
     def find_active_by_socio_id(self, socio_id: int) -> list[dict[str, Any]]:
+        """Créditos ACTIVOS del socio: solo los que aún tienen alguna cuota sin
+        cobrar. Un crédito ya saldado (todas las cuotas con fecha_pago) queda
+        en la base pero no se devuelve, para que no estorbe al resolver un pago
+        (evita el molesto "esa letra ya está pagada" al operar sobre los demás
+        créditos del socio)."""
         cursor = self._conn.cursor()
         cursor.execute(
             """
@@ -82,6 +87,10 @@ class CreditosRepository:
             FROM creditos c
             JOIN socio_credito sc ON c.letra = sc.credito_letra
             WHERE sc.socio_id = %s
+              AND EXISTS (
+                  SELECT 1 FROM liquidaciones l
+                  WHERE l.credito_letra = c.letra AND l.fecha_pago IS NULL
+              )
             """,
             (socio_id,),
         )
