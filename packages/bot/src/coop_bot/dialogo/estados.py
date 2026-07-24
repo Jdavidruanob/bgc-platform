@@ -31,6 +31,7 @@ from coop_contracts.intenciones import (
     IntLiquidacionLetra,
     IntListarSocios,
     IntPagoSalario,
+    IntPedirExcel,
     IntRegAporte,
     IntRegCombinado,
     IntRegPago,
@@ -115,6 +116,9 @@ class SesionDialogo:
     plan: PlanRecibo | None = None
     # Pago de salario pendiente de confirmar (mes + monto sugerido).
     salario_pendiente: SalarioPendiente | None = None
+    # Último documento entregado en la conversación (para "mándamelo en
+    # excel"). No se limpia en _reset_operacion: sobrevive a la operación.
+    ultimo_documento: DocumentoReciente | None = None
     actualizado_en: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -168,6 +172,14 @@ class SalarioPendiente:
     monto: int
 
 
+@dataclass
+class DocumentoReciente:
+    """Último documento entregado, para poder mandarlo en Excel si lo piden."""
+
+    tipo: Literal["recibo", "liquidacion_credito", "liquidacion_actual"]
+    id: int  # recibo_id o letra_id, según el tipo
+
+
 class MaquinaEstados:
     def __init__(self, sesion: SesionDialogo, cliente: ApiClient) -> None:
         self.sesion = sesion
@@ -196,6 +208,9 @@ class MaquinaEstados:
             self.sesion.texto_acumulado = None
             self.sesion.intencion = intencion
             return await self._preparar_salario(intencion)
+        if isinstance(intencion, IntPedirExcel):
+            self.sesion.texto_acumulado = None
+            return await self._enviar_ultimo_excel()
         if not isinstance(
             intencion,
             IntRegAporte
@@ -606,6 +621,9 @@ class MaquinaEstados:
                 documentos.append((f"Liquidacion_actual_letra_{letra}.pdf", pdf_bytes))
                 encontradas.append(letra)
 
+        if len(encontradas) == 1:
+            self.sesion.ultimo_documento = DocumentoReciente(tipo="liquidacion_actual", id=encontradas[0])
+
         if encontradas and not no_encontradas:
             if len(encontradas) == 1:
                 texto = f"Aquí está la liquidación actual de la letra {encontradas[0]}."
@@ -622,6 +640,34 @@ class MaquinaEstados:
             faltan = ", ".join(str(letra) for letra in no_encontradas)
             texto = f"No encontré créditos con esas letras: {faltan}."
         return texto, documentos
+
+    async def _enviar_ultimo_excel(self) -> RespuestaDialogo:
+        """El bot siempre manda PDF por defecto. Solo manda Excel si lo piden
+        explícitamente, sobre el último documento entregado en la sesión."""
+        doc = self.sesion.ultimo_documento
+        if doc is None:
+            return self._quedarse_en_espera(
+                "No tengo un documento reciente para mandarte en Excel. Pídeme la operación primero."
+            )
+
+        if doc.tipo == "recibo":
+            xlsx = await self.cliente.descargar_xlsx_recibo(doc.id)
+            nombre = f"Recibo_{doc.id}.xlsx"
+        elif doc.tipo == "liquidacion_credito":
+            xlsx = await self.cliente.descargar_xlsx_liquidacion(doc.id)
+            nombre = f"Liquidacion_letra_{doc.id}.xlsx"
+        else:
+            xlsx = await self.cliente.descargar_xlsx_liquidacion_actual(doc.id)
+            nombre = f"Liquidacion_actual_letra_{doc.id}.xlsx"
+
+        if xlsx is None:
+            return self._quedarse_en_espera("No pude generar el Excel de ese documento.")
+        return RespuestaDialogo(
+            texto="Aquí está en Excel.",
+            documento_pdf=xlsx,
+            nombre_documento=nombre,
+            cancelar_timeout=True,
+        )
 
     async def _consultar_cuotas(self, intencion: IntConsultarCuotas) -> tuple[str, bytes | None, str | None]:
         nombre_socio = self.sesion.socios[intencion.socio].nombre_completo
@@ -663,6 +709,7 @@ class MaquinaEstados:
         # (entorno sin LibreOffice) se cae al PDF simple de reportlab.
         pdf_bytes_api = await self.cliente.descargar_pdf_recibo(datos.recibo_id)
         pdf_bytes = pdf_bytes_api if pdf_bytes_api is not None else generar_pdf_recibo(datos)
+        self.sesion.ultimo_documento = DocumentoReciente(tipo="recibo", id=datos.recibo_id)
         return pdf_bytes, nombre_archivo_recibo(datos.recibo_id)
 
     async def _ejecutar_plan(self, key: str) -> ReciboData:
@@ -722,6 +769,7 @@ class MaquinaEstados:
 
         pdf_bytes = await self.cliente.descargar_pdf_liquidacion(resp.letra_id)
         nombre_pdf = f"Liquidacion_letra_{resp.letra_id}.pdf" if pdf_bytes is not None else None
+        self.sesion.ultimo_documento = DocumentoReciente(tipo="liquidacion_credito", id=resp.letra_id)
         return texto, pdf_bytes, nombre_pdf
 
     # ── Salario ──────────────────────────────────────────────────────────────
@@ -758,6 +806,7 @@ class MaquinaEstados:
         )
         pdf_bytes = await self.cliente.descargar_pdf_recibo(resp.recibo_id)
         nombre_pdf = f"Salario_{resp.mes}_{resp.recibo_id}.pdf" if pdf_bytes is not None else None
+        self.sesion.ultimo_documento = DocumentoReciente(tipo="recibo", id=resp.recibo_id)
         return texto, pdf_bytes, nombre_pdf
 
     # ── Helpers de estado ─────────────────────────────────────────────────────

@@ -112,13 +112,23 @@ def _guardar(wb: Any) -> bytes:
     return buffer.getvalue()
 
 
-def _forzar_horizontal(ws: Any) -> None:
-    """Orientación horizontal + ajuste a una página de ancho, para que
-    LibreOffice no corte el recibo al convertir a PDF."""
-    ws.page_setup.orientation = "landscape"
+def _configurar_pagina(ws: Any, *, horizontal: bool = False, tamano_carta: bool = True) -> None:
+    """Fuerza orientación, tamaño de hoja y ajuste a una página, para que
+    LibreOffice no corte el documento al convertir a PDF ni elija un tamaño de
+    papel por defecto distinto (algunas plantillas no traen `paperSize` y
+    LibreOffice cae a A4 según el locale del contenedor)."""
+    if horizontal:
+        ws.page_setup.orientation = "landscape"
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 0
+    if tamano_carta:
+        ws.page_setup.paperSize = ws.PAPERSIZE_LETTER
     ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+
+
+def _forzar_horizontal(ws: Any) -> None:
+    """Orientación horizontal + ajuste a una página de ancho + tamaño carta."""
+    _configurar_pagina(ws, horizontal=True)
 
 
 def _cuota_display(pago: LineaPago) -> str:
@@ -324,6 +334,10 @@ def generar_xlsx_liquidacion(datos: DatosLiquidacion) -> bytes:
     wb = _abrir_plantilla("recibo_template_liquidacion.xlsx")
     ws = wb.active
 
+    # La plantilla no traía tamaño de página explícito y LibreOffice caía a A4,
+    # cortando la tabla de cuotas. Se fuerza tamaño carta (vertical).
+    _configurar_pagina(ws, horizontal=False, tamano_carta=True)
+
     ws["B7"] = datos.letra_id
     ws["F7"] = format_miles_colombian_int(datos.capital)
     socios_nombres = [f"{s.nombres} {s.apellidos}".upper().strip() for s in datos.socios]
@@ -390,6 +404,7 @@ def generar_xlsx_salario(datos: DatosSalario) -> bytes:
       B4 = número de recibo · G4 = valor · D6 = fecha · C12 = mes."""
     wb = _abrir_plantilla("recibo_template_salario.xlsx")
     ws = wb.active
+    _forzar_horizontal(ws)
     ws["B4"] = datos.recibo_id
     ws["G4"] = format_miles_colombian_int(datos.valor)
     ws["D6"] = datos.fecha.strftime("%d/%m/%Y")

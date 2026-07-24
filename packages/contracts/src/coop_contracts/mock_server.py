@@ -278,6 +278,35 @@ def get_liquidacion_actual(letra_id: int, _auth: AuthDep = None) -> Response:
     return Response(content=contenido, media_type="application/pdf")
 
 
+@app.get("/creditos/{letra_id}/liquidacion-actual/xlsx")
+def get_liquidacion_actual_xlsx(letra_id: int, _auth: AuthDep = None) -> Response:
+    _find_credito(letra_id)
+    contenido = b"mock xlsx liquidacion actual letra " + str(letra_id).encode()
+    return Response(
+        content=contenido,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@app.get("/recibos/{recibo_id}/xlsx")
+def get_recibo_xlsx(recibo_id: int, _auth: AuthDep = None) -> Response:
+    contenido = b"mock xlsx recibo " + str(recibo_id).encode()
+    return Response(
+        content=contenido,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@app.get("/creditos/{letra_id}/liquidacion/xlsx")
+def get_liquidacion_xlsx(letra_id: int, _auth: AuthDep = None) -> Response:
+    _find_credito(letra_id)
+    contenido = b"mock xlsx liquidacion letra " + str(letra_id).encode()
+    return Response(
+        content=contenido,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
 # ── Caja ──────────────────────────────────────────────────────────────────────
 
 
@@ -633,7 +662,15 @@ def crear_credito(
 
     _state["caja"]["saldo_en_caja"] -= body.capital
     _state["creditos"].append(
-        {"letra": letra_id, "capital": body.capital, "interes": interes, "no_cuotas": body.n_cuotas}
+        {
+            "letra_id": letra_id,
+            "socio_ids": list(body.socio_ids),
+            "capital_original": body.capital,
+            "interes_tasa": interes,
+            "n_cuotas_total": body.n_cuotas,
+            "fecha_inicio": _today(),
+            "socios_nombres": [make_nombre_completo(s) for s in socios],
+        }
     )
 
     resp = CrearCreditoResponse(

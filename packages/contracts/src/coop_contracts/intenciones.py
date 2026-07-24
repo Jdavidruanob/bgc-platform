@@ -119,6 +119,13 @@ class IntConsultarFamilia(BaseModel):
     socio: str
 
 
+class IntPedirExcel(BaseModel):
+    """El operador pide el último documento en Excel en vez de/además de PDF.
+    Sin parámetros: aplica al último documento generado en la sesión."""
+
+    intencion: Literal["pedir_excel"]
+
+
 class IntPagoSalario(BaseModel):
     intencion: Literal["pago_salario"]
     # Mes que se paga (en palabra). Null = el mes actual.
@@ -171,6 +178,7 @@ Intencion = (
     | IntConsultarFamilia
     | IntLiquidacionLetra
     | IntPagoSalario
+    | IntPedirExcel
     | IntAyuda
     | IntDesconocida
     | IntIncompleta

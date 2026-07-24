@@ -202,6 +202,34 @@ class ApiClient:
             self._lanzar_error(response)
         return response.content
 
+    # ── Excel bajo pedido (el bot siempre manda PDF; Excel solo si lo piden) ──
+
+    async def descargar_xlsx_recibo(self, recibo_id: int) -> bytes | None:
+        response = await self._pedir(lambda: self._client.get(f"/recibos/{recibo_id}/xlsx"))
+        if response.status_code == 404:
+            return None
+        if response.is_error:
+            self._lanzar_error(response)
+        return response.content
+
+    async def descargar_xlsx_liquidacion(self, letra_id: int) -> bytes | None:
+        response = await self._pedir(lambda: self._client.get(f"/creditos/{letra_id}/liquidacion/xlsx"))
+        if response.status_code == 404:
+            return None
+        if response.is_error:
+            self._lanzar_error(response)
+        return response.content
+
+    async def descargar_xlsx_liquidacion_actual(self, letra_id: int) -> bytes | None:
+        response = await self._pedir(
+            lambda: self._client.get(f"/creditos/{letra_id}/liquidacion-actual/xlsx")
+        )
+        if response.status_code == 404:
+            return None
+        if response.is_error:
+            self._lanzar_error(response)
+        return response.content
+
     # ── Internos ─────────────────────────────────────────────────────────────
 
     async def _get(self, path: str, params: dict[str, Any], modelo: type[T]) -> T:

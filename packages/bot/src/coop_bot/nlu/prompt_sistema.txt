@@ -189,6 +189,12 @@ Ejemplos:
 "Paga mi salario de marzo de 1.500.000" -> {"intencion": "pago_salario", "mes": "marzo", "monto": 1500000}
 "Cóbrame el sueldo" -> {"intencion": "pago_salario", "mes": null, "monto": null}
 
+### pedir_excel
+El bot SIEMPRE manda el documento en PDF por defecto. Solo cuando el operador pide explícitamente el Excel (del último documento que se mandó), usa esta intención. No lleva parámetros.
+{"intencion": "pedir_excel"}
+
+Ejemplos: "Mándamelo en Excel", "En Excel porfa", "¿Me lo pasas en Excel?", "También en Excel", "Necesito el archivo de Excel, no el PDF".
+
 ## Intención de ayuda (el operador pregunta qué puede hacer o cómo se hace algo)
 
 ### ayuda

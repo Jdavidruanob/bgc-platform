@@ -129,24 +129,22 @@ def descargar_liquidacion_xlsx(letra_id: int, db: DbDep, _auth: AuthDep) -> Resp
     )
 
 
-@router.get("/{letra_id}/liquidacion-actual/pdf", response_model=None)
-def descargar_liquidacion_actual(letra_id: int, db: DbDep, _auth: AuthDep) -> Response | JSONResponse:
-    """Genera al vuelo la liquidación con el estado ACTUAL del crédito (cuotas
-    pagadas con su fecha). No se guarda en la base — es un documento desechable
-    para consulta."""
+def _construir_datos_liquidacion_actual(letra_id: int, db: DbDep) -> DatosLiquidacion | str:
+    """Devuelve los datos de la liquidación actual, o un código de error
+    ('LETRA_NO_ENCONTRADA' | 'SIN_CUOTAS') si no se puede construir."""
     credito = CreditosRepository(db).find_by_letra(letra_id)
     if credito is None:
-        return not_found("LETRA_NO_ENCONTRADA", f"No existe un crédito con letra {letra_id}.")
+        return "LETRA_NO_ENCONTRADA"
 
     cuotas = LiquidacionesRepository(db).find_all_by_letra(letra_id)
     if not cuotas:
-        return not_found("SIN_CUOTAS", f"El crédito {letra_id} no tiene cuotas registradas.")
+        return "SIN_CUOTAS"
 
     socios_nombres = str(credito.get("socios_nombres") or "").split(", ")
     fecha_inicio_raw = str(credito["fecha_inicio"])[:10]
     fecha_inicio = datetime.strptime(fecha_inicio_raw, "%Y-%m-%d").date()
 
-    datos = DatosLiquidacion(
+    return DatosLiquidacion(
         letra_id=letra_id,
         capital=int(credito["capital"]),
         interes=float(credito["interes"]),
@@ -168,6 +166,22 @@ def descargar_liquidacion_actual(letra_id: int, db: DbDep, _auth: AuthDep) -> Re
         ],
     )
 
+
+def _error_liquidacion_actual(codigo: str, letra_id: int) -> JSONResponse:
+    if codigo == "LETRA_NO_ENCONTRADA":
+        return not_found("LETRA_NO_ENCONTRADA", f"No existe un crédito con letra {letra_id}.")
+    return not_found("SIN_CUOTAS", f"El crédito {letra_id} no tiene cuotas registradas.")
+
+
+@router.get("/{letra_id}/liquidacion-actual/pdf", response_model=None)
+def descargar_liquidacion_actual(letra_id: int, db: DbDep, _auth: AuthDep) -> Response | JSONResponse:
+    """Genera al vuelo la liquidación con el estado ACTUAL del crédito (cuotas
+    pagadas con su fecha). No se guarda en la base — es un documento desechable
+    para consulta."""
+    datos = _construir_datos_liquidacion_actual(letra_id, db)
+    if isinstance(datos, str):
+        return _error_liquidacion_actual(datos, letra_id)
+
     xlsx = generar_xlsx_liquidacion(datos)
     try:
         pdf = xlsx_a_pdf(xlsx)
@@ -186,4 +200,20 @@ def descargar_liquidacion_actual(letra_id: int, db: DbDep, _auth: AuthDep) -> Re
         content=pdf,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="Liquidacion_actual_letra_{letra_id}.pdf"'},
+    )
+
+
+@router.get("/{letra_id}/liquidacion-actual/xlsx", response_model=None)
+def descargar_liquidacion_actual_xlsx(letra_id: int, db: DbDep, _auth: AuthDep) -> Response | JSONResponse:
+    """Misma liquidación actual, pero en Excel. Se genera al vuelo, tampoco se
+    guarda (documento desechable)."""
+    datos = _construir_datos_liquidacion_actual(letra_id, db)
+    if isinstance(datos, str):
+        return _error_liquidacion_actual(datos, letra_id)
+
+    xlsx = generar_xlsx_liquidacion(datos)
+    return Response(
+        content=xlsx,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="Liquidacion_actual_letra_{letra_id}.xlsx"'},
     )

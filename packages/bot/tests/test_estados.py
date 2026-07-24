@@ -15,6 +15,7 @@ from coop_contracts.intenciones import (
     IntLiquidacionLetra,
     IntListarSocios,
     IntPagoSalario,
+    IntPedirExcel,
     IntRegAporte,
     IntRegCombinado,
     IntRegPago,
@@ -237,6 +238,45 @@ async def test_liquidacion_letra_inexistente(api_client: ApiClient) -> None:
     )
     assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
     assert "no encontré" in respuesta.texto.lower()
+
+
+# ── Excel bajo pedido ──────────────────────────────────────────────────────
+
+
+async def test_pedir_excel_sin_documento_previo(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    respuesta = await maquina.procesar_intencion(IntPedirExcel(intencion="pedir_excel"))
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert "No tengo un documento reciente" in respuesta.texto
+
+
+async def test_pedir_excel_de_liquidacion_actual(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    await maquina.procesar_intencion(IntLiquidacionLetra(intencion="liquidacion_letra", letras=[450]))
+    respuesta = await maquina.procesar_intencion(IntPedirExcel(intencion="pedir_excel"))
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert respuesta.documento_pdf is not None
+    assert respuesta.nombre_documento == "Liquidacion_actual_letra_450.xlsx"
+
+
+async def test_pedir_excel_no_se_ofrece_con_varias_letras(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    await maquina.procesar_intencion(IntLiquidacionLetra(intencion="liquidacion_letra", letras=[450, 451]))
+    respuesta = await maquina.procesar_intencion(IntPedirExcel(intencion="pedir_excel"))
+    assert "No tengo un documento reciente" in respuesta.texto
+
+
+async def test_pedir_excel_de_credito_nuevo(api_client: ApiClient) -> None:
+    maquina = _maquina(api_client)
+    await maquina.procesar_intencion(
+        IntCrearCredito(intencion="crear_credito", socios=["Carmenza Suárez"], capital=1200000, n_cuotas=12)
+    )
+    await maquina.recibir_confirmacion("sí")
+    respuesta = await maquina.procesar_intencion(IntPedirExcel(intencion="pedir_excel"))
+    assert respuesta.documento_pdf is not None
+    assert respuesta.nombre_documento is not None
+    assert respuesta.nombre_documento.startswith("Liquidacion_letra_")
+    assert respuesta.nombre_documento.endswith(".xlsx")
 
 
 async def test_pago_todas_letras_pide_confirmacion_y_ejecuta(api_client: ApiClient) -> None:
