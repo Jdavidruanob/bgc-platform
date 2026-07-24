@@ -8,7 +8,7 @@ from coop_bot.notificaciones.notificadores import (
     WaMeLinkNotificador,
     construir_notificador,
 )
-from coop_contracts.notificador import ResultadoEnvio
+from coop_contracts.notificador import ParamsPlantilla, ResultadoEnvio
 
 
 def _config(**overrides: object) -> Config:
@@ -109,6 +109,77 @@ def test_cloud_api_notificador_enviar_documento_falla_si_falla_la_subida() -> No
     assert "Unsupported media type" in resultado.error
 
 
+def test_cloud_api_notificador_usa_plantilla_con_el_pdf_en_el_encabezado() -> None:
+    """Con plantilla configurada se manda `type: template`: es lo único que Meta
+    permite para escribirle a un socio fuera de la ventana de 24h."""
+    payloads: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/media"):
+            return httpx.Response(200, json={"id": "media-999"})
+        payloads.append(json.loads(request.read()))
+        return httpx.Response(200, json={"messages": [{"id": "wamid.3"}]})
+
+    notificador = CloudApiNotificador(
+        token="t",
+        phone_number_id="1",
+        plantilla="comprobante_operacion",
+        plantilla_idioma="es",
+        transport=httpx.MockTransport(handler),
+    )
+    resultado = notificador.enviar_documento(
+        "+573112223344",
+        "texto largo que no se usa en plantilla",
+        b"%PDF-1.4",
+        "Recibo_7.pdf",
+        ParamsPlantilla(nombre="Pedro", detalle="Registramos tu aporte de $50.000"),
+    )
+
+    assert resultado.exitoso is True
+    payload = payloads[0]
+    assert payload["type"] == "template"
+    assert payload["template"]["name"] == "comprobante_operacion"
+    assert payload["template"]["language"]["code"] == "es"
+
+    encabezado, cuerpo = payload["template"]["components"]
+    assert encabezado["parameters"][0]["document"] == {
+        "id": "media-999",
+        "filename": "Recibo_7.pdf",
+    }
+    assert [p["text"] for p in cuerpo["parameters"]] == [
+        "Pedro",
+        "Registramos tu aporte de $50.000",
+    ]
+
+
+def test_cloud_api_notificador_sin_plantilla_configurada_manda_documento_libre() -> None:
+    payloads: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/media"):
+            return httpx.Response(200, json={"id": "media-1"})
+        payloads.append(json.loads(request.read()))
+        return httpx.Response(200, json={"messages": [{"id": "wamid.4"}]})
+
+    notificador = CloudApiNotificador(token="t", phone_number_id="1", transport=httpx.MockTransport(handler))
+    notificador.enviar_documento(
+        "+573112223344",
+        "Tu recibo",
+        b"%PDF",
+        "a.pdf",
+        ParamsPlantilla(nombre="Pedro", detalle="algo"),
+    )
+
+    assert payloads[0]["type"] == "document"
+
+
+def test_params_plantilla_se_aplanan_a_una_linea() -> None:
+    """Meta rechaza variables con saltos de línea o espacios repetidos."""
+    limpios = ParamsPlantilla(nombre="Pedro", detalle="linea uno\nlinea    dos\ttres").limpiar()
+
+    assert limpios.detalle == "linea uno linea dos tres"
+
+
 # ── WaMeLinkNotificador ──────────────────────────────────────────────────────
 
 
@@ -152,7 +223,12 @@ class _NotificadorFijo:
         return self._resultado
 
     def enviar_documento(
-        self, numero_e164: str, texto: str, contenido: bytes, nombre_archivo: str
+        self,
+        numero_e164: str,
+        texto: str,
+        contenido: bytes,
+        nombre_archivo: str,
+        plantilla: ParamsPlantilla | None = None,
     ) -> ResultadoEnvio:
         return self._resultado
 

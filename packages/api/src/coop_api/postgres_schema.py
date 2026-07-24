@@ -103,7 +103,10 @@ CREATE TABLE IF NOT EXISTS notificaciones_whatsapp (
     -- Documento a adjuntar (opcional): 'recibo' | 'liquidacion' | NULL (solo texto).
     -- documento_id es recibo_id o letra_id según documento_tipo.
     documento_tipo      TEXT,
-    documento_id        INTEGER
+    documento_id        INTEGER,
+    -- Resumen de la operación en UNA sola línea, para usarlo como variable de
+    -- la plantilla de Meta (las variables no admiten saltos de línea).
+    detalle             TEXT
 );
 
 CREATE TABLE IF NOT EXISTS idempotency_keys (
@@ -161,4 +164,5 @@ MIGRATIONS_POSTGRES: tuple[str, ...] = (
     "ALTER TABLE socios ADD COLUMN IF NOT EXISTS familia_id INTEGER",
     "ALTER TABLE notificaciones_whatsapp ADD COLUMN IF NOT EXISTS documento_tipo TEXT",
     "ALTER TABLE notificaciones_whatsapp ADD COLUMN IF NOT EXISTS documento_id INTEGER",
+    "ALTER TABLE notificaciones_whatsapp ADD COLUMN IF NOT EXISTS detalle TEXT",
 )

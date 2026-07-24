@@ -123,6 +123,7 @@ NOTIFICACIONES_INICIALES: list[dict] = [
         "estado": "pendiente",
         "fecha_creacion": "2026-07-20T10:00:00",
         "socio_nombre": "María López Herrera",
+        "detalle": "Registramos tu aporte de $250.000 y tu nuevo saldo es $1.250.000",
     }
 ]
 

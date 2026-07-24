@@ -596,6 +596,24 @@ def test_notificacion_saluda_por_nombre_y_trae_nombre_del_socio(client: TestClie
     assert "Pedro" in notifs[0]["socio_nombre"]
 
 
+def test_notificacion_guarda_detalle_en_una_sola_linea(client: TestClient, socio_pedro):
+    """`detalle` viaja como variable de la plantilla de Meta, que rechaza
+    saltos de línea y tabulaciones."""
+    r = client.post(
+        "/operaciones/aportes",
+        json={"recibi_de_id": socio_pedro, "aportes": [{"socio_id": socio_pedro, "monto": 50000}]},
+        headers=_idem(),
+    )
+    assert r.status_code == 201
+    notifs = client.get("/notificaciones/pendientes", headers=AUTH).json()["notificaciones"]
+    detalle = notifs[0]["detalle"]
+
+    assert detalle.startswith("Registramos tu aporte de $50.000 y tu nuevo saldo es $")
+    assert "\n" not in detalle and "\t" not in detalle
+    # El mensaje completo se construye a partir del mismo detalle.
+    assert detalle in notifs[0]["texto"]
+
+
 # ── Fuzzy search unitario ─────────────────────────────────────────────────────
 
 

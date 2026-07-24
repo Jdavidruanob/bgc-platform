@@ -26,6 +26,10 @@ class Config:
     log_level: str = "INFO"
     whatsapp_cloud_api_token: str | None = None
     whatsapp_phone_number_id: str | None = None
+    # Plantilla de utilidad aprobada por Meta. Sin ella solo se puede escribir
+    # a socios que hayan escrito en las últimas 24h (ver ADR-010).
+    whatsapp_plantilla: str | None = None
+    whatsapp_plantilla_idioma: str = "es"
 
     @property
     def telegram_operador_chat_id(self) -> int:
@@ -48,6 +52,8 @@ class Config:
             log_level=os.environ.get("LOG_LEVEL", "INFO"),
             whatsapp_cloud_api_token=os.environ.get("WHATSAPP_CLOUD_API_TOKEN") or None,
             whatsapp_phone_number_id=os.environ.get("WHATSAPP_PHONE_NUMBER_ID") or None,
+            whatsapp_plantilla=os.environ.get("WHATSAPP_PLANTILLA") or None,
+            whatsapp_plantilla_idioma=os.environ.get("WHATSAPP_PLANTILLA_IDIOMA") or "es",
         )
 
     @staticmethod

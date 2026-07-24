@@ -13,7 +13,7 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 
-from coop_contracts.notificador import Notificador
+from coop_contracts.notificador import Notificador, ParamsPlantilla
 from coop_contracts.respuestas import NotificacionPendiente
 
 from coop_bot.api.cliente import ApiClient, ApiError
@@ -77,6 +77,7 @@ async def _procesar_una(
                 notificacion.texto,
                 contenido,
                 nombre_archivo,
+                _params_plantilla(notificacion),
             )
         else:
             resultado = await asyncio.to_thread(
@@ -100,6 +101,17 @@ async def _procesar_una(
     else:
         resumen.fallos.append((notificacion.socio_nombre, resultado.error))
         await _marcar(cliente, notificacion.id, "fallida", resultado.error, resumen)
+
+
+def _params_plantilla(notificacion: NotificacionPendiente) -> ParamsPlantilla | None:
+    """Variables de la plantilla de Meta. None si la notificación no trae el
+    resumen de una línea (notificaciones viejas, anteriores a la plantilla):
+    en ese caso se manda como texto libre."""
+    if not notificacion.detalle:
+        return None
+    partes = notificacion.socio_nombre.strip().split()
+    nombre = partes[0].capitalize() if partes else "socio"
+    return ParamsPlantilla(nombre=nombre, detalle=notificacion.detalle)
 
 
 async def _descargar_documento(

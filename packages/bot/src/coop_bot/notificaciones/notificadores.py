@@ -13,10 +13,12 @@ event loop al llamarlas.
 from __future__ import annotations
 
 import urllib.parse
+from typing import Any
 
 import httpx
 from coop_contracts.notificador import (
     Notificador,
+    ParamsPlantilla,
     ResultadoEnvio,
 )
 
@@ -41,10 +43,14 @@ class CloudApiNotificador:
         token: str,
         phone_number_id: str,
         *,
+        plantilla: str | None = None,
+        plantilla_idioma: str = "es",
         timeout: float = 10.0,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         self._phone_number_id = phone_number_id
+        self._plantilla = plantilla
+        self._plantilla_idioma = plantilla_idioma
         self._client = httpx.Client(
             base_url=self._BASE_URL,
             timeout=timeout,
@@ -69,11 +75,21 @@ class CloudApiNotificador:
         return ResultadoEnvio(exitoso=True, canal="cloud_api")
 
     def enviar_documento(
-        self, numero_e164: str, texto: str, contenido: bytes, nombre_archivo: str
+        self,
+        numero_e164: str,
+        texto: str,
+        contenido: bytes,
+        nombre_archivo: str,
+        plantilla: ParamsPlantilla | None = None,
     ) -> ResultadoEnvio:
-        """Sube el PDF a Meta (endpoint /media) y lo manda como mensaje tipo
-        documento con el texto como caption. Dos llamadas HTTP porque WhatsApp
-        Cloud API no acepta el binario inline en el mensaje."""
+        """Sube el PDF a Meta (endpoint /media) y lo manda adjunto. Dos llamadas
+        HTTP porque Cloud API no acepta el binario inline en el mensaje.
+
+        Si hay plantilla configurada se envía como `type: template` con el PDF
+        en el encabezado, que es lo único que Meta permite para escribirle a un
+        socio que no ha escrito en las últimas 24h. Si no, se manda como
+        documento con texto libre (solo llega dentro de esa ventana de 24h).
+        """
         try:
             subida = self._client.post(
                 f"/{self._VERSION}/{self._phone_number_id}/media",
@@ -90,12 +106,17 @@ class CloudApiNotificador:
         if not media_id:
             return ResultadoEnvio(exitoso=False, canal="cloud_api", error="Meta no devolvió media id")
 
-        payload = {
-            "messaging_product": "whatsapp",
-            "to": numero_e164.removeprefix("+"),
-            "type": "document",
-            "document": {"id": media_id, "filename": nombre_archivo, "caption": texto},
-        }
+        destino = numero_e164.removeprefix("+")
+        if self._plantilla and plantilla is not None:
+            payload = self._payload_plantilla(destino, media_id, nombre_archivo, plantilla.limpiar())
+        else:
+            payload = {
+                "messaging_product": "whatsapp",
+                "to": destino,
+                "type": "document",
+                "document": {"id": media_id, "filename": nombre_archivo, "caption": texto},
+            }
+
         try:
             respuesta = self._client.post(f"/{self._VERSION}/{self._phone_number_id}/messages", json=payload)
         except httpx.HTTPError as exc:
@@ -104,6 +125,37 @@ class CloudApiNotificador:
         if respuesta.is_error:
             return ResultadoEnvio(exitoso=False, canal="cloud_api", error=_extraer_error_meta(respuesta))
         return ResultadoEnvio(exitoso=True, canal="cloud_api")
+
+    def _payload_plantilla(
+        self, destino: str, media_id: str, nombre_archivo: str, params: ParamsPlantilla
+    ) -> dict[str, Any]:
+        return {
+            "messaging_product": "whatsapp",
+            "to": destino,
+            "type": "template",
+            "template": {
+                "name": self._plantilla,
+                "language": {"code": self._plantilla_idioma},
+                "components": [
+                    {
+                        "type": "header",
+                        "parameters": [
+                            {
+                                "type": "document",
+                                "document": {"id": media_id, "filename": nombre_archivo},
+                            }
+                        ],
+                    },
+                    {
+                        "type": "body",
+                        "parameters": [
+                            {"type": "text", "text": params.nombre},
+                            {"type": "text", "text": params.detalle},
+                        ],
+                    },
+                ],
+            },
+        }
 
     def cerrar(self) -> None:
         self._client.close()
@@ -124,7 +176,12 @@ class WaMeLinkNotificador:
         return ResultadoEnvio(exitoso=True, canal="wa_me_link", wa_me_url=url)
 
     def enviar_documento(
-        self, numero_e164: str, texto: str, contenido: bytes, nombre_archivo: str
+        self,
+        numero_e164: str,
+        texto: str,
+        contenido: bytes,
+        nombre_archivo: str,
+        plantilla: ParamsPlantilla | None = None,
     ) -> ResultadoEnvio:
         """El link wa.me no puede adjuntar archivos: se degrada a un enlace de
         texto que avisa del documento, para que el tesorero lo abra y lo envíe
@@ -151,12 +208,17 @@ class NotificadorConFallback:
         return self._fallback.enviar(numero_e164, texto)
 
     def enviar_documento(
-        self, numero_e164: str, texto: str, contenido: bytes, nombre_archivo: str
+        self,
+        numero_e164: str,
+        texto: str,
+        contenido: bytes,
+        nombre_archivo: str,
+        plantilla: ParamsPlantilla | None = None,
     ) -> ResultadoEnvio:
-        resultado = self._primario.enviar_documento(numero_e164, texto, contenido, nombre_archivo)
+        resultado = self._primario.enviar_documento(numero_e164, texto, contenido, nombre_archivo, plantilla)
         if resultado.exitoso:
             return resultado
-        return self._fallback.enviar_documento(numero_e164, texto, contenido, nombre_archivo)
+        return self._fallback.enviar_documento(numero_e164, texto, contenido, nombre_archivo, plantilla)
 
 
 def construir_notificador(config: Config) -> Notificador:
@@ -166,6 +228,8 @@ def construir_notificador(config: Config) -> Notificador:
         primario = CloudApiNotificador(
             token=config.whatsapp_cloud_api_token,
             phone_number_id=config.whatsapp_phone_number_id,
+            plantilla=config.whatsapp_plantilla,
+            plantilla_idioma=config.whatsapp_plantilla_idioma,
         )
         return NotificadorConFallback(primario, fallback)
     return fallback

@@ -14,16 +14,17 @@ class NotificacionesRepository:
         texto: str,
         documento_tipo: str | None = None,
         documento_id: int | None = None,
+        detalle: str | None = None,
     ) -> int:
         cursor = self._conn.cursor()
         cursor.execute(
             """
             INSERT INTO notificaciones_whatsapp
-                (socio_id, numero_e164, texto, documento_tipo, documento_id)
-            VALUES (%s, %s, %s, %s, %s)
+                (socio_id, numero_e164, texto, documento_tipo, documento_id, detalle)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING id
             """,
-            (socio_id, numero_e164, texto, documento_tipo, documento_id),
+            (socio_id, numero_e164, texto, documento_tipo, documento_id, detalle),
         )
         return int(cursor.fetchone()[0])
 
@@ -32,7 +33,7 @@ class NotificacionesRepository:
         cursor.execute(
             """
             SELECT n.id, n.socio_id, n.numero_e164, n.texto, n.created_at,
-                   n.documento_tipo, n.documento_id,
+                   n.documento_tipo, n.documento_id, n.detalle,
                    s.nombres, s.apellidos
             FROM notificaciones_whatsapp n
             JOIN socios s ON s.id = n.socio_id

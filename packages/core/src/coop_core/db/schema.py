@@ -106,6 +106,7 @@ CREATE TABLE IF NOT EXISTS notificaciones_whatsapp (
     error TEXT,
     documento_tipo TEXT,
     documento_id INTEGER,
+    detalle TEXT,
     FOREIGN KEY (socio_id) REFERENCES socios(id)
 );
 
