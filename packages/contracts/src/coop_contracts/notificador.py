@@ -16,13 +16,26 @@ class ResultadoEnvio(BaseModel):
 class Notificador(Protocol):
     def enviar(self, numero_e164: str, texto: str) -> ResultadoEnvio: ...
 
+    def enviar_documento(
+        self, numero_e164: str, texto: str, contenido: bytes, nombre_archivo: str
+    ) -> ResultadoEnvio: ...
+
 
 class MockNotificador:
     """Implementación de pruebas: registra los envíos en memoria sin hacer llamadas externas."""
 
     def __init__(self) -> None:
         self.enviados: list[dict[str, str]] = []
+        self.documentos_enviados: list[dict[str, str]] = []
 
     def enviar(self, numero_e164: str, texto: str) -> ResultadoEnvio:
         self.enviados.append({"numero_e164": numero_e164, "texto": texto})
+        return ResultadoEnvio(exitoso=True, canal="mock")
+
+    def enviar_documento(
+        self, numero_e164: str, texto: str, contenido: bytes, nombre_archivo: str
+    ) -> ResultadoEnvio:
+        self.documentos_enviados.append(
+            {"numero_e164": numero_e164, "texto": texto, "nombre_archivo": nombre_archivo}
+        )
         return ResultadoEnvio(exitoso=True, canal="mock")

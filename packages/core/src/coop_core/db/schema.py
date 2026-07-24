@@ -104,6 +104,8 @@ CREATE TABLE IF NOT EXISTS notificaciones_whatsapp (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ultimo_intento_at TIMESTAMP,
     error TEXT,
+    documento_tipo TEXT,
+    documento_id INTEGER,
     FOREIGN KEY (socio_id) REFERENCES socios(id)
 );
 

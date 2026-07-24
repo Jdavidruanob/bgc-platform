@@ -22,6 +22,8 @@ def get_pendientes(db: DbDep, _auth: AuthDep) -> NotificacionesPendientesRespons
             numero_e164=str(r["numero_e164"]),
             texto=str(r["texto"]),
             fecha_creacion=str(r["created_at"]),
+            documento_tipo=str(r["documento_tipo"]) if r.get("documento_tipo") else None,
+            documento_id=int(r["documento_id"]) if r.get("documento_id") is not None else None,
         )
         for r in rows
     ]

@@ -39,6 +39,7 @@ from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse
 
 import coop_api.idempotency as idem
+from coop_api import notificaciones_wire
 from coop_api.deps import AuthDep, DbDep
 from coop_api.errors import not_found, value_error_to_response
 from coop_api.recibos import wire as recibos_wire
@@ -154,6 +155,7 @@ def registrar_aportes(
         saldo_caja_nuevo=resultado["nuevo_saldo_caja"],
     )
     recibos_wire.guardar_recibo_aporte(db, resultado, recibi_de)
+    notificaciones_wire.notificar_aportes(db, resultado)
     idem.store(db, idem_key, "POST /operaciones/aportes", payload_json, resp.model_dump())
     db.commit()
     return resp
@@ -194,6 +196,7 @@ def registrar_retiro(
         saldo_caja_nuevo=resultado["nuevo_saldo_caja"],
     )
     recibos_wire.guardar_recibo_retiro(db, resultado, socio)
+    notificaciones_wire.notificar_retiro(db, resultado, socio)
     idem.store(db, idem_key, "POST /operaciones/retiros", payload_json, resp.model_dump())
     db.commit()
     return resp
@@ -272,6 +275,7 @@ def registrar_pagos(
         saldo_caja_nuevo=resultado["nuevo_saldo_caja"],
     )
     recibos_wire.guardar_recibo_pago(db, resultado, recibi_de)
+    notificaciones_wire.notificar_pagos(db, resultado)
     idem.store(db, idem_key, "POST /operaciones/pagos", payload_json, resp.model_dump())
     db.commit()
     return resp
@@ -370,6 +374,7 @@ def registrar_combinado(
         saldo_caja_nuevo=resultado["nuevo_saldo_caja"],
     )
     recibos_wire.guardar_recibo_combinado(db, resultado, recibi_de, n_cobrables)
+    notificaciones_wire.notificar_combinado(db, resultado)
     idem.store(db, idem_key, "POST /operaciones/combinados", payload_json, resp.model_dump())
     db.commit()
     return resp
@@ -426,6 +431,7 @@ def crear_credito(
     # CreditoService.create ya hizo commit del crédito. La liquidación y la clave
     # de idempotencia se guardan en transacciones posteriores.
     recibos_wire.guardar_liquidacion_credito(db, resultado)
+    notificaciones_wire.notificar_credito_nuevo(db, resultado)
     idem.store(db, idem_key, "POST /operaciones/creditos", payload_json, resp.model_dump())
     db.commit()
     return resp

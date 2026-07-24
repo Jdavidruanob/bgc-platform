@@ -68,6 +68,43 @@ class CloudApiNotificador:
             return ResultadoEnvio(exitoso=False, canal="cloud_api", error=_extraer_error_meta(respuesta))
         return ResultadoEnvio(exitoso=True, canal="cloud_api")
 
+    def enviar_documento(
+        self, numero_e164: str, texto: str, contenido: bytes, nombre_archivo: str
+    ) -> ResultadoEnvio:
+        """Sube el PDF a Meta (endpoint /media) y lo manda como mensaje tipo
+        documento con el texto como caption. Dos llamadas HTTP porque WhatsApp
+        Cloud API no acepta el binario inline en el mensaje."""
+        try:
+            subida = self._client.post(
+                f"/{self._VERSION}/{self._phone_number_id}/media",
+                data={"messaging_product": "whatsapp", "type": "application/pdf"},
+                files={"file": (nombre_archivo, contenido, "application/pdf")},
+            )
+        except httpx.HTTPError as exc:
+            return ResultadoEnvio(exitoso=False, canal="cloud_api", error=str(exc))
+
+        if subida.is_error:
+            return ResultadoEnvio(exitoso=False, canal="cloud_api", error=_extraer_error_meta(subida))
+
+        media_id = subida.json().get("id")
+        if not media_id:
+            return ResultadoEnvio(exitoso=False, canal="cloud_api", error="Meta no devolvió media id")
+
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": numero_e164.removeprefix("+"),
+            "type": "document",
+            "document": {"id": media_id, "filename": nombre_archivo, "caption": texto},
+        }
+        try:
+            respuesta = self._client.post(f"/{self._VERSION}/{self._phone_number_id}/messages", json=payload)
+        except httpx.HTTPError as exc:
+            return ResultadoEnvio(exitoso=False, canal="cloud_api", error=str(exc))
+
+        if respuesta.is_error:
+            return ResultadoEnvio(exitoso=False, canal="cloud_api", error=_extraer_error_meta(respuesta))
+        return ResultadoEnvio(exitoso=True, canal="cloud_api")
+
     def cerrar(self) -> None:
         self._client.close()
 
@@ -86,6 +123,15 @@ class WaMeLinkNotificador:
         url = f"https://wa.me/{numero}?text={urllib.parse.quote(texto)}"
         return ResultadoEnvio(exitoso=True, canal="wa_me_link", wa_me_url=url)
 
+    def enviar_documento(
+        self, numero_e164: str, texto: str, contenido: bytes, nombre_archivo: str
+    ) -> ResultadoEnvio:
+        """El link wa.me no puede adjuntar archivos: se degrada a un enlace de
+        texto que avisa del documento, para que el tesorero lo abra y lo envíe
+        manualmente (o lo reenvíe desde Telegram)."""
+        aviso = f"{texto}\n\n(Documento: {nombre_archivo} — pídemelo en el bot si lo necesitas)"
+        return self.enviar(numero_e164, aviso)
+
 
 class NotificadorConFallback:
     """Intenta con el notificador primario; si falla, recurre al fallback.
@@ -103,6 +149,14 @@ class NotificadorConFallback:
         if resultado.exitoso:
             return resultado
         return self._fallback.enviar(numero_e164, texto)
+
+    def enviar_documento(
+        self, numero_e164: str, texto: str, contenido: bytes, nombre_archivo: str
+    ) -> ResultadoEnvio:
+        resultado = self._primario.enviar_documento(numero_e164, texto, contenido, nombre_archivo)
+        if resultado.exitoso:
+            return resultado
+        return self._fallback.enviar_documento(numero_e164, texto, contenido, nombre_archivo)
 
 
 def construir_notificador(config: Config) -> Notificador:

@@ -255,6 +255,9 @@ class NotificacionPendiente(BaseModel):
     numero_e164: str
     texto: str
     fecha_creacion: str
+    # Documento a adjuntar: 'recibo' | 'liquidacion' | None (solo texto).
+    documento_tipo: str | None = None
+    documento_id: int | None = None
 
 
 class NotificacionesPendientesResponse(BaseModel):

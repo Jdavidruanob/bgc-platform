@@ -99,7 +99,11 @@ CREATE TABLE IF NOT EXISTS notificaciones_whatsapp (
     intentos            INTEGER NOT NULL DEFAULT 0,
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     ultimo_intento_at   TIMESTAMP,
-    error               TEXT
+    error               TEXT,
+    -- Documento a adjuntar (opcional): 'recibo' | 'liquidacion' | NULL (solo texto).
+    -- documento_id es recibo_id o letra_id según documento_tipo.
+    documento_tipo      TEXT,
+    documento_id        INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS idempotency_keys (
@@ -155,4 +159,6 @@ CONFIG_DEFAULTS = {
 MIGRATIONS_POSTGRES: tuple[str, ...] = (
     "ALTER TABLE socios ADD COLUMN IF NOT EXISTS foto BYTEA",
     "ALTER TABLE socios ADD COLUMN IF NOT EXISTS familia_id INTEGER",
+    "ALTER TABLE notificaciones_whatsapp ADD COLUMN IF NOT EXISTS documento_tipo TEXT",
+    "ALTER TABLE notificaciones_whatsapp ADD COLUMN IF NOT EXISTS documento_id INTEGER",
 )

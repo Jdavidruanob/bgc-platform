@@ -499,6 +499,85 @@ def test_patch_notificacion(client: TestClient, socio_pedro, db_conn):
     assert r2.json()["notificaciones"] == []
 
 
+def test_aporte_encola_notificacion_de_recibo(client: TestClient, socio_pedro):
+    r = client.post(
+        "/operaciones/aportes",
+        json={"recibi_de_id": socio_pedro, "aportes": [{"socio_id": socio_pedro, "monto": 80000}]},
+        headers=_idem(),
+    )
+    assert r.status_code == 201
+    recibo_id = r.json()["recibo_id"]
+
+    r2 = client.get("/notificaciones/pendientes", headers=AUTH)
+    notifs = r2.json()["notificaciones"]
+    assert len(notifs) == 1
+    assert notifs[0]["socio_id"] == socio_pedro
+    assert notifs[0]["numero_e164"] == "+573001234567"
+    assert notifs[0]["documento_tipo"] == "recibo"
+    assert notifs[0]["documento_id"] == recibo_id
+    assert "80.000" in notifs[0]["texto"]
+
+
+def test_retiro_encola_notificacion(client: TestClient, socio_pedro):
+    r = client.post(
+        "/operaciones/retiros",
+        json={"socio_id": socio_pedro, "monto": 50000},
+        headers=_idem(),
+    )
+    assert r.status_code == 201
+    notifs = client.get("/notificaciones/pendientes", headers=AUTH).json()["notificaciones"]
+    assert len(notifs) == 1
+    assert "retiro" in notifs[0]["texto"].lower()
+    assert "50.000" in notifs[0]["texto"]
+
+
+def test_pago_encola_notificacion(client: TestClient, socio_pedro, credito_pedro):
+    r = client.post(
+        "/operaciones/pagos",
+        json={
+            "recibi_de_id": socio_pedro,
+            "pagos": [
+                {"socio_id": socio_pedro, "letra_id": credito_pedro, "n_cuotas": 1, "abono_capital": 0}
+            ],
+        },
+        headers=_idem(),
+    )
+    assert r.status_code == 201
+    notifs = client.get("/notificaciones/pendientes", headers=AUTH).json()["notificaciones"]
+    assert len(notifs) == 1
+    assert str(credito_pedro) in notifs[0]["texto"]
+
+
+def test_socio_sin_telefono_no_encola_notificacion(client: TestClient, db_conn):
+    from coop_core.repositories.socios_repo import SociosRepository
+
+    repo = SociosRepository(db_conn)
+    sid = repo.save("Sin", "Teléfono", None, None, saldo=0)
+    db_conn.commit()
+
+    r = client.post(
+        "/operaciones/aportes",
+        json={"recibi_de_id": sid, "aportes": [{"socio_id": sid, "monto": 10000}]},
+        headers=_idem(),
+    )
+    assert r.status_code == 201
+    notifs = client.get("/notificaciones/pendientes", headers=AUTH).json()["notificaciones"]
+    assert notifs == []
+
+
+def test_crear_credito_encola_notificacion_sin_documento(client: TestClient, socio_pedro):
+    r = client.post(
+        "/operaciones/creditos",
+        json={"socio_ids": [socio_pedro], "capital": 600000, "n_cuotas": 6},
+        headers=_idem(),
+    )
+    assert r.status_code == 201
+    notifs = client.get("/notificaciones/pendientes", headers=AUTH).json()["notificaciones"]
+    assert len(notifs) == 1
+    assert notifs[0]["documento_tipo"] is None
+    assert "aprobado" in notifs[0]["texto"].lower()
+
+
 # ── Fuzzy search unitario ─────────────────────────────────────────────────────
 
 

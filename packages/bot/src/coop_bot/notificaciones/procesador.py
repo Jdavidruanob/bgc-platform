@@ -49,8 +49,22 @@ async def _procesar_una(
     notificacion: NotificacionPendiente,
     resumen: ResumenProcesamiento,
 ) -> None:
+    documento = await _descargar_documento(cliente, notificacion)
+
     try:
-        resultado = await asyncio.to_thread(notificador.enviar, notificacion.numero_e164, notificacion.texto)
+        if documento is not None:
+            contenido, nombre_archivo = documento
+            resultado = await asyncio.to_thread(
+                notificador.enviar_documento,
+                notificacion.numero_e164,
+                notificacion.texto,
+                contenido,
+                nombre_archivo,
+            )
+        else:
+            resultado = await asyncio.to_thread(
+                notificador.enviar, notificacion.numero_e164, notificacion.texto
+            )
     except Exception as exc:  # noqa: BLE001 - cualquier fallo del canal es recuperable
         logger.exception("El notificador lanzó una excepción para la notificación %s", notificacion.id)
         await _marcar(cliente, notificacion.id, "fallida", str(exc), resumen)
@@ -60,6 +74,34 @@ async def _procesar_una(
         await _marcar(cliente, notificacion.id, "enviada", None, resumen)
     else:
         await _marcar(cliente, notificacion.id, "fallida", resultado.error, resumen)
+
+
+async def _descargar_documento(
+    cliente: ApiClient, notificacion: NotificacionPendiente
+) -> tuple[bytes, str] | None:
+    """Trae el PDF a adjuntar, si la notificación tiene uno. None si es de solo
+    texto, o si el documento ya no está disponible (se manda solo el texto)."""
+    if notificacion.documento_tipo is None or notificacion.documento_id is None:
+        return None
+
+    try:
+        if notificacion.documento_tipo == "recibo":
+            pdf = await cliente.descargar_pdf_recibo(notificacion.documento_id)
+            nombre = f"Recibo_{notificacion.documento_id}.pdf"
+        elif notificacion.documento_tipo == "liquidacion":
+            pdf = await cliente.descargar_pdf_liquidacion(notificacion.documento_id)
+            nombre = f"Liquidacion_letra_{notificacion.documento_id}.pdf"
+        else:
+            return None
+    except ApiError:
+        logger.warning(
+            "No se pudo descargar el documento de la notificación %s", notificacion.id, exc_info=True
+        )
+        return None
+
+    if pdf is None:
+        return None
+    return pdf, nombre
 
 
 async def _marcar(

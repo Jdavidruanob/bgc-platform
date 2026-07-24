@@ -7,15 +7,23 @@ class NotificacionesRepository:
     def __init__(self, conn: DbConnection) -> None:
         self._conn = conn
 
-    def create(self, socio_id: int, numero_e164: str, texto: str) -> int:
+    def create(
+        self,
+        socio_id: int,
+        numero_e164: str,
+        texto: str,
+        documento_tipo: str | None = None,
+        documento_id: int | None = None,
+    ) -> int:
         cursor = self._conn.cursor()
         cursor.execute(
             """
-            INSERT INTO notificaciones_whatsapp (socio_id, numero_e164, texto)
-            VALUES (%s, %s, %s)
+            INSERT INTO notificaciones_whatsapp
+                (socio_id, numero_e164, texto, documento_tipo, documento_id)
+            VALUES (%s, %s, %s, %s, %s)
             RETURNING id
             """,
-            (socio_id, numero_e164, texto),
+            (socio_id, numero_e164, texto, documento_tipo, documento_id),
         )
         return int(cursor.fetchone()[0])
 
@@ -23,7 +31,7 @@ class NotificacionesRepository:
         cursor = self._conn.cursor()
         cursor.execute(
             """
-            SELECT id, socio_id, numero_e164, texto, created_at
+            SELECT id, socio_id, numero_e164, texto, created_at, documento_tipo, documento_id
             FROM notificaciones_whatsapp
             WHERE estado = 'pendiente'
             ORDER BY created_at ASC
