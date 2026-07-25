@@ -15,18 +15,63 @@ class NotificacionesRepository:
         documento_tipo: str | None = None,
         documento_id: int | None = None,
         detalle: str | None = None,
+        estado: str = "pendiente",
     ) -> int:
+        """`estado='borrador'` deja la notificación redactada pero SIN enviar,
+        esperando que el administrador la apruebe (ver `aprobar_por_documento`).
+        El procesador de la cola solo recoge las que quedan en 'pendiente'."""
         cursor = self._conn.cursor()
         cursor.execute(
             """
             INSERT INTO notificaciones_whatsapp
-                (socio_id, numero_e164, texto, documento_tipo, documento_id, detalle)
-            VALUES (%s, %s, %s, %s, %s, %s)
+                (socio_id, numero_e164, texto, documento_tipo, documento_id, detalle, estado)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING id
             """,
-            (socio_id, numero_e164, texto, documento_tipo, documento_id, detalle),
+            (socio_id, numero_e164, texto, documento_tipo, documento_id, detalle, estado),
         )
         return int(cursor.fetchone()[0])
+
+    def find_borradores_por_documento(self, documento_tipo: str, documento_id: int) -> list[dict[str, Any]]:
+        """Borradores (aún sin aprobar) de un documento, con el nombre del socio."""
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """
+            SELECT n.id, n.socio_id, s.nombres, s.apellidos
+            FROM notificaciones_whatsapp n
+            JOIN socios s ON s.id = n.socio_id
+            WHERE n.estado = 'borrador'
+              AND n.documento_tipo = %s AND n.documento_id = %s
+            ORDER BY n.id ASC
+            """,
+            (documento_tipo, documento_id),
+        )
+        cols = [d[0] for d in cursor.description]
+        return [dict(zip(cols, row, strict=False)) for row in cursor.fetchall()]
+
+    def aprobar_por_documento(self, documento_tipo: str, documento_id: int) -> None:
+        """Pasa los borradores de ese documento a 'pendiente' (para que el
+        procesador los envíe)."""
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """
+            UPDATE notificaciones_whatsapp SET estado = 'pendiente'
+            WHERE estado = 'borrador' AND documento_tipo = %s AND documento_id = %s
+            """,
+            (documento_tipo, documento_id),
+        )
+
+    def descartar_por_documento(self, documento_tipo: str, documento_id: int) -> None:
+        """Marca los borradores de ese documento como 'descartada' (el admin
+        decidió no enviarlos)."""
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """
+            UPDATE notificaciones_whatsapp SET estado = 'descartada'
+            WHERE estado = 'borrador' AND documento_tipo = %s AND documento_id = %s
+            """,
+            (documento_tipo, documento_id),
+        )
 
     def find_pending(self) -> list[dict[str, Any]]:
         cursor = self._conn.cursor()

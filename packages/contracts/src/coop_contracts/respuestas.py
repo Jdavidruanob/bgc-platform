@@ -286,6 +286,28 @@ class PatchNotificacionRequest(BaseModel):
     error: str | None = None
 
 
+class BorradorNotificacion(BaseModel):
+    id: int
+    socio_id: int
+    socio_nombre: str
+
+
+class BorradoresResponse(BaseModel):
+    borradores: list[BorradorNotificacion]
+
+
+class DocumentoNotificacionRequest(BaseModel):
+    """Identifica el documento cuyos borradores se aprueban o descartan."""
+
+    documento_tipo: str  # "recibo" | "liquidacion"
+    documento_id: int
+
+
+class AccionBorradoresResponse(BaseModel):
+    afectados: int
+    socios: list[str]
+
+
 # ── Errores ───────────────────────────────────────────────────────────────────
 
 

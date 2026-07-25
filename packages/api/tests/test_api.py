@@ -555,7 +555,26 @@ def test_patch_notificacion(client: TestClient, socio_pedro, db_conn):
     assert r2.json()["notificaciones"] == []
 
 
-def test_aporte_encola_notificacion_de_recibo(client: TestClient, socio_pedro):
+def _notifs(db_conn):
+    """Lee las notificaciones directo de la base (incluye estado, texto, detalle)."""
+    cur = db_conn.cursor()
+    cur.execute(
+        "SELECT socio_id, numero_e164, texto, detalle, documento_tipo, documento_id, estado "
+        "FROM notificaciones_whatsapp ORDER BY id"
+    )
+    cols = [d[0] for d in cur.description]
+    return [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
+
+
+def _borradores(client, tipo, doc_id):
+    return client.get(f"/notificaciones/borradores/{tipo}/{doc_id}", headers=AUTH).json()["borradores"]
+
+
+def _pendientes(client):
+    return client.get("/notificaciones/pendientes", headers=AUTH).json()["notificaciones"]
+
+
+def test_aporte_crea_borrador_de_recibo(client: TestClient, socio_pedro, db_conn):
     r = client.post(
         "/operaciones/aportes",
         json={"recibi_de_id": socio_pedro, "aportes": [{"socio_id": socio_pedro, "monto": 80000}]},
@@ -564,30 +583,27 @@ def test_aporte_encola_notificacion_de_recibo(client: TestClient, socio_pedro):
     assert r.status_code == 201
     recibo_id = r.json()["recibo_id"]
 
-    r2 = client.get("/notificaciones/pendientes", headers=AUTH)
-    notifs = r2.json()["notificaciones"]
-    assert len(notifs) == 1
-    assert notifs[0]["socio_id"] == socio_pedro
-    assert notifs[0]["numero_e164"] == "+573001234567"
-    assert notifs[0]["documento_tipo"] == "recibo"
-    assert notifs[0]["documento_id"] == recibo_id
-    assert "80.000" in notifs[0]["texto"]
+    # No se envía solo: no hay pendientes, sí hay un borrador esperando aprobación.
+    assert _pendientes(client) == []
+    borr = _borradores(client, "recibo", recibo_id)
+    assert len(borr) == 1 and borr[0]["socio_id"] == socio_pedro
+
+    n = _notifs(db_conn)[0]
+    assert n["estado"] == "borrador"
+    assert n["documento_tipo"] == "recibo" and n["documento_id"] == recibo_id
+    assert n["numero_e164"] == "+573001234567"
+    assert "80.000" in n["texto"]
 
 
-def test_retiro_encola_notificacion(client: TestClient, socio_pedro):
-    r = client.post(
-        "/operaciones/retiros",
-        json={"socio_id": socio_pedro, "monto": 50000},
-        headers=_idem(),
-    )
+def test_retiro_crea_borrador(client: TestClient, socio_pedro, db_conn):
+    r = client.post("/operaciones/retiros", json={"socio_id": socio_pedro, "monto": 50000}, headers=_idem())
     assert r.status_code == 201
-    notifs = client.get("/notificaciones/pendientes", headers=AUTH).json()["notificaciones"]
-    assert len(notifs) == 1
-    assert "retiro" in notifs[0]["texto"].lower()
-    assert "50.000" in notifs[0]["texto"]
+    n = _notifs(db_conn)
+    assert len(n) == 1 and n[0]["estado"] == "borrador"
+    assert "retiro" in n[0]["texto"].lower() and "50.000" in n[0]["texto"]
 
 
-def test_pago_encola_notificacion(client: TestClient, socio_pedro, credito_pedro):
+def test_pago_crea_borrador(client: TestClient, socio_pedro, credito_pedro, db_conn):
     r = client.post(
         "/operaciones/pagos",
         json={
@@ -599,12 +615,12 @@ def test_pago_encola_notificacion(client: TestClient, socio_pedro, credito_pedro
         headers=_idem(),
     )
     assert r.status_code == 201
-    notifs = client.get("/notificaciones/pendientes", headers=AUTH).json()["notificaciones"]
-    assert len(notifs) == 1
-    assert str(credito_pedro) in notifs[0]["texto"]
+    n = _notifs(db_conn)
+    assert len(n) == 1 and n[0]["estado"] == "borrador"
+    assert str(credito_pedro) in n[0]["texto"]
 
 
-def test_socio_sin_telefono_no_encola_notificacion(client: TestClient, db_conn):
+def test_socio_sin_telefono_no_crea_borrador(client: TestClient, db_conn):
     from coop_core.repositories.socios_repo import SociosRepository
 
     repo = SociosRepository(db_conn)
@@ -617,12 +633,11 @@ def test_socio_sin_telefono_no_encola_notificacion(client: TestClient, db_conn):
         headers=_idem(),
     )
     assert r.status_code == 201
-    notifs = client.get("/notificaciones/pendientes", headers=AUTH).json()["notificaciones"]
-    assert notifs == []
+    assert _notifs(db_conn) == []
 
 
-def test_crear_credito_encola_notificacion_con_liquidacion(client: TestClient, socio_pedro):
-    """El crédito no genera recibo, pero sí liquidación: el socio la recibe adjunta."""
+def test_crear_credito_crea_borrador_de_liquidacion(client: TestClient, socio_pedro, db_conn):
+    """El crédito no genera recibo, pero sí liquidación: el borrador la adjunta."""
     r = client.post(
         "/operaciones/creditos",
         json={"socio_ids": [socio_pedro], "capital": 600000, "n_cuotas": 6},
@@ -630,29 +645,26 @@ def test_crear_credito_encola_notificacion_con_liquidacion(client: TestClient, s
     )
     assert r.status_code == 201
     letra_id = r.json()["letra_id"]
-    notifs = client.get("/notificaciones/pendientes", headers=AUTH).json()["notificaciones"]
-    assert len(notifs) == 1
-    assert notifs[0]["documento_tipo"] == "liquidacion"
-    assert notifs[0]["documento_id"] == letra_id
-    assert "aprobado" in notifs[0]["texto"].lower()
+    assert len(_borradores(client, "liquidacion", letra_id)) == 1
+    n = _notifs(db_conn)[0]
+    assert n["estado"] == "borrador"
+    assert n["documento_tipo"] == "liquidacion" and n["documento_id"] == letra_id
+    assert "aprobado" in n["texto"].lower()
 
 
-def test_notificacion_saluda_por_nombre_y_trae_nombre_del_socio(client: TestClient, socio_pedro):
-    """El mensaje al socio abre con un saludo por su nombre de pila, y la cola
-    expone el nombre completo para poder avisarle al operador quién recibió."""
+def test_borrador_saluda_por_nombre(client: TestClient, socio_pedro, db_conn):
     r = client.post(
         "/operaciones/aportes",
         json={"recibi_de_id": socio_pedro, "aportes": [{"socio_id": socio_pedro, "monto": 50000}]},
         headers=_idem(),
     )
     assert r.status_code == 201
-    notifs = client.get("/notificaciones/pendientes", headers=AUTH).json()["notificaciones"]
-    assert len(notifs) == 1
-    assert notifs[0]["texto"].startswith("Hola Pedro")
-    assert "Pedro" in notifs[0]["socio_nombre"]
+    recibo_id = r.json()["recibo_id"]
+    assert _notifs(db_conn)[0]["texto"].startswith("Hola Pedro")
+    assert "Pedro" in _borradores(client, "recibo", recibo_id)[0]["socio_nombre"]
 
 
-def test_notificacion_guarda_detalle_en_una_sola_linea(client: TestClient, socio_pedro):
+def test_borrador_detalle_en_una_sola_linea(client: TestClient, socio_pedro, db_conn):
     """`detalle` viaja como variable de la plantilla de Meta, que rechaza
     saltos de línea y tabulaciones."""
     r = client.post(
@@ -661,13 +673,49 @@ def test_notificacion_guarda_detalle_en_una_sola_linea(client: TestClient, socio
         headers=_idem(),
     )
     assert r.status_code == 201
-    notifs = client.get("/notificaciones/pendientes", headers=AUTH).json()["notificaciones"]
-    detalle = notifs[0]["detalle"]
-
+    n = _notifs(db_conn)[0]
+    detalle = n["detalle"]
     assert detalle.startswith("Registramos tu aporte de $50.000 y tu nuevo saldo es $")
     assert "\n" not in detalle and "\t" not in detalle
-    # El mensaje completo se construye a partir del mismo detalle.
-    assert detalle in notifs[0]["texto"]
+    assert detalle in n["texto"]
+
+
+def test_aprobar_borradores_los_pasa_a_pendiente(client: TestClient, socio_pedro, db_conn):
+    r = client.post(
+        "/operaciones/aportes",
+        json={"recibi_de_id": socio_pedro, "aportes": [{"socio_id": socio_pedro, "monto": 50000}]},
+        headers=_idem(),
+    )
+    recibo_id = r.json()["recibo_id"]
+
+    ra = client.post(
+        "/notificaciones/aprobar",
+        json={"documento_tipo": "recibo", "documento_id": recibo_id},
+        headers=AUTH,
+    )
+    assert ra.status_code == 200 and ra.json()["afectados"] == 1
+
+    pend = _pendientes(client)
+    assert len(pend) == 1 and pend[0]["documento_id"] == recibo_id
+    assert _borradores(client, "recibo", recibo_id) == []
+
+
+def test_descartar_borradores_no_los_envia(client: TestClient, socio_pedro, db_conn):
+    r = client.post(
+        "/operaciones/aportes",
+        json={"recibi_de_id": socio_pedro, "aportes": [{"socio_id": socio_pedro, "monto": 50000}]},
+        headers=_idem(),
+    )
+    recibo_id = r.json()["recibo_id"]
+
+    rd = client.post(
+        "/notificaciones/descartar",
+        json={"documento_tipo": "recibo", "documento_id": recibo_id},
+        headers=AUTH,
+    )
+    assert rd.status_code == 200 and rd.json()["afectados"] == 1
+    assert _pendientes(client) == []
+    assert _notifs(db_conn)[0]["estado"] == "descartada"
 
 
 # ── Fuzzy search unitario ─────────────────────────────────────────────────────

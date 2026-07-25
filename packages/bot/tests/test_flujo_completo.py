@@ -31,14 +31,39 @@ async def test_flujo_completo_aporte_multiple(api_client: ApiClient) -> None:
     assert "$50.000" in respuesta_resumen.texto
 
     respuesta_final = await maquina.recibir_confirmacion("confirmo")
-    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    # Tras entregar el comprobante al admin, pregunta si enviarlo al socio por WhatsApp.
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_CONFIRMACION_WPP
+    assert "WhatsApp" in respuesta_final.texto
     assert respuesta_final.documento_pdf is not None
     assert respuesta_final.nombre_documento is not None
+
+    cierre = await maquina.recibir_confirmacion_wpp("sí")
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert "envío el comprobante" in cierre.texto.lower()
 
     maria = await api_client.get_socio(3)
     carmenza = await api_client.get_socio(4)
     assert maria.saldo == 250000 + 80000
     assert carmenza.saldo == 180000 + 50000
+
+
+async def test_flujo_aporte_no_envia_wpp_si_admin_dice_no(api_client: ApiClient) -> None:
+    maquina = MaquinaEstados(SesionDialogo(chat_id=1), api_client)
+    intencion = IntRegAporte(
+        intencion="registrar_aporte",
+        recibi_de="María López Herrera",
+        aportes=[AporteItem(nombre="María López Herrera", monto=80000)],
+    )
+    await maquina.procesar_intencion(intencion)
+    await maquina.recibir_confirmacion("confirmo")
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_CONFIRMACION_WPP
+
+    cierre = await maquina.recibir_confirmacion_wpp("no")
+    assert maquina.sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE
+    assert "no lo envié" in cierre.texto.lower()
+    # El borrador del recibo de este aporte NO quedó pendiente de envío (se descartó).
+    pendientes = await api_client.get_notificaciones_pendientes()
+    assert all(n.documento_tipo != "recibo" for n in pendientes.notificaciones)
 
 
 async def test_flujo_completo_pago_con_letra_hint(api_client: ApiClient) -> None:

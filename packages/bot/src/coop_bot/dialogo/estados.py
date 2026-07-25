@@ -8,6 +8,7 @@ programa/cancela el job es el adaptador de Telegram.
 
 from __future__ import annotations
 
+import contextlib
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -91,8 +92,19 @@ class EstadoDialogo(StrEnum):
     PROCESANDO = "procesando"
     ESPERANDO_DESAMBIGUACION = "esperando_desambiguacion"
     ESPERANDO_CONFIRMACION = "esperando_confirmacion"
+    # Tras entregar el comprobante al admin, se le pregunta si lo manda al socio.
+    ESPERANDO_CONFIRMACION_WPP = "esperando_confirmacion_wpp"
     EJECUTANDO = "ejecutando"
     RESPONDIENDO = "respondiendo"
+
+
+@dataclass
+class WppPendiente:
+    """Borradores de WhatsApp esperando que el admin confirme el envío al socio."""
+
+    documento_tipo: str  # "recibo" | "liquidacion"
+    documento_id: int
+    socio_nombres: list[str]
 
 
 @dataclass
@@ -121,6 +133,8 @@ class SesionDialogo:
     # Último documento entregado en la conversación (para "mándamelo en
     # excel"). No se limpia en _reset_operacion: sobrevive a la operación.
     ultimo_documento: DocumentoReciente | None = None
+    # Envío de WhatsApp al socio pendiente de que el admin confirme.
+    wpp_pendiente: WppPendiente | None = None
     actualizado_en: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -271,14 +285,7 @@ class MaquinaEstados:
                 self._reset_operacion()
                 self.sesion.estado = EstadoDialogo.ESPERANDO_MENSAJE
                 return RespuestaDialogo(texto=exc.mensaje, cancelar_timeout=True)
-            self._reset_operacion()
-            self.sesion.estado = EstadoDialogo.ESPERANDO_MENSAJE
-            return RespuestaDialogo(
-                texto=texto_ok,
-                documento_pdf=pdf_bytes,
-                nombre_documento=nombre_pdf,
-                cancelar_timeout=True,
-            )
+            return await self._finalizar_con_wpp(texto_ok, pdf_bytes, nombre_pdf)
 
         if not _es_afirmacion(texto):
             return RespuestaDialogo(
@@ -306,7 +313,42 @@ class MaquinaEstados:
             return RespuestaDialogo(texto=exc.mensaje, cancelar_timeout=True)
 
         self.sesion.estado = EstadoDialogo.RESPONDIENDO
+        return await self._finalizar_con_wpp(texto_ok, pdf_bytes, nombre_pdf)
+
+    async def _finalizar_con_wpp(
+        self, texto_ok: str, pdf_bytes: bytes | None, nombre_pdf: str | None
+    ) -> RespuestaDialogo:
+        """Entrega el comprobante al admin y, si la operación generó borradores
+        de WhatsApp para socios, le pregunta si los envía. Si no hay ninguno,
+        termina normal."""
+        doc = self.sesion.ultimo_documento
         self._reset_operacion()
+
+        tipo_api = None
+        if doc is not None and doc.tipo == "recibo":
+            tipo_api = "recibo"
+        elif doc is not None and doc.tipo == "liquidacion_credito":
+            tipo_api = "liquidacion"
+
+        nombres: list[str] = []
+        if tipo_api is not None and doc is not None:
+            try:
+                resp = await self.cliente.get_borradores(tipo_api, doc.id)
+                nombres = [b.socio_nombre for b in resp.borradores]
+            except ApiError:
+                nombres = []
+
+        if tipo_api is not None and doc is not None and nombres:
+            self.sesion.wpp_pendiente = WppPendiente(tipo_api, doc.id, nombres)
+            self.sesion.estado = EstadoDialogo.ESPERANDO_CONFIRMACION_WPP
+            lista = ", ".join(nombres)
+            return RespuestaDialogo(
+                texto=f"{texto_ok}\n\n¿Le envío el comprobante por WhatsApp a {lista}? (sí / no)",
+                documento_pdf=pdf_bytes,
+                nombre_documento=nombre_pdf,
+                requiere_timeout=True,
+            )
+
         self.sesion.estado = EstadoDialogo.ESPERANDO_MENSAJE
         return RespuestaDialogo(
             texto=texto_ok,
@@ -314,6 +356,34 @@ class MaquinaEstados:
             nombre_documento=nombre_pdf,
             cancelar_timeout=True,
         )
+
+    async def recibir_confirmacion_wpp(self, texto: str) -> RespuestaDialogo:
+        """Respuesta del admin a '¿le envío el comprobante al socio?'."""
+        pendiente = self.sesion.wpp_pendiente
+        if pendiente is None:
+            self.sesion.estado = EstadoDialogo.ESPERANDO_MENSAJE
+            return RespuestaDialogo(texto="Operación terminada.", cancelar_timeout=True)
+
+        lista = ", ".join(pendiente.socio_nombres)
+        if _es_afirmacion(texto):
+            try:
+                await self.cliente.aprobar_borradores(pendiente.documento_tipo, pendiente.documento_id)
+                mensaje = f"Listo, le envío el comprobante a {lista}. ✅"
+            except ApiError as exc:
+                mensaje = f"No pude programar el envío: {exc.mensaje}"
+        elif _es_negacion(texto):
+            with contextlib.suppress(ApiError):
+                await self.cliente.descartar_borradores(pendiente.documento_tipo, pendiente.documento_id)
+            mensaje = "Listo, no lo envié. Operación terminada. Si necesitas otra cosa, solo dime."
+        else:
+            return RespuestaDialogo(
+                texto=f"¿Le envío el comprobante a {lista}? Responde «sí» o «no».",
+                requiere_timeout=True,
+            )
+
+        self.sesion.wpp_pendiente = None
+        self.sesion.estado = EstadoDialogo.ESPERANDO_MENSAJE
+        return RespuestaDialogo(texto=mensaje, cancelar_timeout=True)
 
     def cancelar_por_timeout(self) -> RespuestaDialogo:
         return self._cancelar("Operación cancelada por inactividad (pasaron más de 5 minutos).")
@@ -871,6 +941,7 @@ class MaquinaEstados:
         self.sesion.texto_acumulado = None
         self.sesion.plan = None
         self.sesion.salario_pendiente = None
+        self.sesion.wpp_pendiente = None
 
 
 # ── Helpers de módulo ──────────────────────────────────────────────────────────

@@ -7,8 +7,10 @@ from typing import Any, TypeVar
 
 import httpx
 from coop_contracts.respuestas import (
+    AccionBorradoresResponse,
     AportesRequest,
     AportesResponse,
+    BorradoresResponse,
     CajaEstado,
     CombinadoResponse,
     CombinadosRequest,
@@ -19,6 +21,7 @@ from coop_contracts.respuestas import (
     CuotasPendientesResponse,
     DevolucionTotalRequest,
     DevolucionTotalResponse,
+    DocumentoNotificacionRequest,
     FamiliaResponse,
     NotificacionesPendientesResponse,
     PagosRequest,
@@ -140,6 +143,26 @@ class ApiClient:
         )
         if response.is_error:
             self._lanzar_error(response)
+
+    async def get_borradores(self, documento_tipo: str, documento_id: int) -> BorradoresResponse:
+        return await self._get(
+            f"/notificaciones/borradores/{documento_tipo}/{documento_id}", {}, BorradoresResponse
+        )
+
+    async def aprobar_borradores(self, documento_tipo: str, documento_id: int) -> AccionBorradoresResponse:
+        return await self._accion_borradores("/notificaciones/aprobar", documento_tipo, documento_id)
+
+    async def descartar_borradores(self, documento_tipo: str, documento_id: int) -> AccionBorradoresResponse:
+        return await self._accion_borradores("/notificaciones/descartar", documento_tipo, documento_id)
+
+    async def _accion_borradores(
+        self, path: str, documento_tipo: str, documento_id: int
+    ) -> AccionBorradoresResponse:
+        body = DocumentoNotificacionRequest(documento_tipo=documento_tipo, documento_id=documento_id)
+        response = await self._pedir(lambda: self._client.post(path, json=body.model_dump(mode="json")))
+        if response.is_error:
+            self._lanzar_error(response)
+        return AccionBorradoresResponse.model_validate(response.json())
 
     # ── Operaciones ──────────────────────────────────────────────────────────
 

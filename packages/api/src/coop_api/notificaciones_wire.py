@@ -11,6 +11,10 @@ Cada notificación guarda dos versiones del mismo aviso:
 - `texto`: el mensaje completo ya redactado, que se usa cuando se envía como
   texto libre o cuando se cae al fallback wa.me.
 
+Las notificaciones se crean como BORRADOR: no se envían solas. El bot le
+pregunta al administrador si desea mandarle el comprobante al socio y, solo si
+confirma, las aprueba (borrador → pendiente) para que el procesador las envíe.
+
 Nunca bloquea ni falla la operación: si un socio no tiene número derivable, se
 salta en silencio (no todos los socios tienen WhatsApp registrado aún).
 """
@@ -75,7 +79,9 @@ def _encolar(
     if numero is None:
         return
     texto = _mensaje(socio.get("nombres"), detalle, cierre)
-    repo.create(socio_id, numero, texto, documento_tipo, documento_id, detalle)
+    # Se crea como BORRADOR: no se envía hasta que el administrador lo apruebe
+    # desde el chat del bot (ver ADR-010 y el flujo de confirmación).
+    repo.create(socio_id, numero, texto, documento_tipo, documento_id, detalle, estado="borrador")
 
 
 def _detalle_aporte(a: dict[str, Any]) -> str:

@@ -218,6 +218,8 @@ async def _procesar_texto_entrante(update: Update, context: ContextTypes.DEFAULT
         respuesta = await maquina.recibir_respuesta_desambiguacion(texto)
     elif sesion.estado == EstadoDialogo.ESPERANDO_CONFIRMACION:
         respuesta = await maquina.recibir_confirmacion(texto)
+    elif sesion.estado == EstadoDialogo.ESPERANDO_CONFIRMACION_WPP:
+        respuesta = await maquina.recibir_confirmacion_wpp(texto)
     elif sesion.estado == EstadoDialogo.ESPERANDO_MENSAJE:
         if _es_saludo(texto):
             await enviar_texto(context, chat_id, _mensaje_bienvenida(update))

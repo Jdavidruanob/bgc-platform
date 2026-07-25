@@ -16,9 +16,12 @@ from fastapi.responses import JSONResponse, Response
 
 from coop_contracts.mock_data import get_initial_state, make_nombre_completo
 from coop_contracts.respuestas import (
+    AccionBorradoresResponse,
     AporteResultItem,
     AportesRequest,
     AportesResponse,
+    BorradoresResponse,
+    BorradorNotificacion,
     CajaEstado,
     CombinadoResponse,
     CombinadosRequest,
@@ -33,6 +36,7 @@ from coop_contracts.respuestas import (
     CuotasPendientesResponse,
     DevolucionTotalRequest,
     DevolucionTotalResponse,
+    DocumentoNotificacionRequest,
     ErrorDetail,
     ErrorResponse,
     FamiliaResponse,
@@ -425,6 +429,7 @@ def registrar_aportes(
         saldo_caja_nuevo=_state["caja"]["saldo_en_caja"],
     )
     _store_idempotency(idem_key, payload_hash, resp.model_dump())
+    _crear_borrador_wpp(recibi_de, "recibo", recibo_id)
     return resp
 
 
@@ -729,6 +734,70 @@ def crear_credito(
 
 
 # ── Notificaciones ────────────────────────────────────────────────────────────
+
+
+def _crear_borrador_wpp(socio: dict, documento_tipo: str, documento_id: int) -> None:
+    """Crea un borrador de WhatsApp (como la API real) para el socio dado."""
+    if not socio.get("whatsapp_e164"):
+        return
+    nid = _state.get("next_notif_id", 100)
+    _state["next_notif_id"] = nid + 1
+    _state["notificaciones"].append(
+        {
+            "id": nid,
+            "socio_id": socio["id"],
+            "numero_e164": socio["whatsapp_e164"],
+            "texto": "Comprobante de la operación.",
+            "estado": "borrador",
+            "fecha_creacion": _today(),
+            "socio_nombre": make_nombre_completo(socio),
+            "detalle": "Registramos tu operación",
+            "documento_tipo": documento_tipo,
+            "documento_id": documento_id,
+        }
+    )
+
+
+@app.get("/notificaciones/borradores/{documento_tipo}/{documento_id}")
+def get_borradores(documento_tipo: str, documento_id: int, _auth: AuthDep = None) -> BorradoresResponse:
+    bs = [
+        n
+        for n in _state["notificaciones"]
+        if n["estado"] == "borrador"
+        and n.get("documento_tipo") == documento_tipo
+        and n.get("documento_id") == documento_id
+    ]
+    return BorradoresResponse(
+        borradores=[
+            BorradorNotificacion(id=n["id"], socio_id=n["socio_id"], socio_nombre=n["socio_nombre"])
+            for n in bs
+        ]
+    )
+
+
+def _accion_borradores(body: DocumentoNotificacionRequest, nuevo_estado: str) -> AccionBorradoresResponse:
+    afectados = []
+    for n in _state["notificaciones"]:
+        if (
+            n["estado"] == "borrador"
+            and n.get("documento_tipo") == body.documento_tipo
+            and n.get("documento_id") == body.documento_id
+        ):
+            n["estado"] = nuevo_estado
+            afectados.append(n["socio_nombre"])
+    return AccionBorradoresResponse(afectados=len(afectados), socios=afectados)
+
+
+@app.post("/notificaciones/aprobar")
+def aprobar_borradores(body: DocumentoNotificacionRequest, _auth: AuthDep = None) -> AccionBorradoresResponse:
+    return _accion_borradores(body, "pendiente")
+
+
+@app.post("/notificaciones/descartar")
+def descartar_borradores(
+    body: DocumentoNotificacionRequest, _auth: AuthDep = None
+) -> AccionBorradoresResponse:
+    return _accion_borradores(body, "descartada")
 
 
 @app.get("/notificaciones/pendientes")
