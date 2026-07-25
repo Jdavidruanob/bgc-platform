@@ -54,7 +54,10 @@ CREATE TABLE IF NOT EXISTS liquidaciones (
     interes_mora        INTEGER DEFAULT 0,
     mora_aplicada       INTEGER DEFAULT 0,
     notif_prev_enviada  INTEGER DEFAULT 0,
-    notif_venc_enviada  INTEGER DEFAULT 0
+    notif_venc_enviada  INTEGER DEFAULT 0,
+    -- Exención manual: si está en 1, el sistema no cobra mora en esta cuota
+    -- (aunque esté vencida) ni la muestra como VENCIDA en la liquidación.
+    mora_exenta         INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS recibos (
@@ -167,4 +170,5 @@ MIGRATIONS_POSTGRES: tuple[str, ...] = (
     "ALTER TABLE notificaciones_whatsapp ADD COLUMN IF NOT EXISTS documento_id INTEGER",
     "ALTER TABLE notificaciones_whatsapp ADD COLUMN IF NOT EXISTS detalle TEXT",
     "ALTER TABLE socios ADD COLUMN IF NOT EXISTS activo INTEGER DEFAULT 1",
+    "ALTER TABLE liquidaciones ADD COLUMN IF NOT EXISTS mora_exenta INTEGER DEFAULT 0",
 )
