@@ -13,6 +13,7 @@ import logging
 
 from telegram.ext import ApplicationBuilder
 
+from coop_bot import entorno
 from coop_bot.adaptadores.telegram import registrar_handlers, registrar_jobs
 from coop_bot.api.cliente import ApiClient
 from coop_bot.config import Config
@@ -35,6 +36,10 @@ def main() -> None:
     logging.basicConfig(
         level=getattr(logging, config.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+
+    logging.getLogger(__name__).info(
+        "Entorno: %s · API: %s", entorno.etiqueta(config.app_env), config.coop_api_base_url
     )
 
     application = ApplicationBuilder().token(config.telegram_bot_token).build()

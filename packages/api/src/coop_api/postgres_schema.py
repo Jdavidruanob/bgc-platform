@@ -136,18 +136,21 @@ CREATE TABLE IF NOT EXISTS audit_log (
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- pdf_bytes admite NULL: el bot genera xlsx + pdf, pero la app de escritorio
+-- solo produce el xlsx. Guardar el Excel siempre es lo que permite que la
+-- carpeta Archivos_BGC quede sincronizada venga de donde venga el recibo.
 CREATE TABLE IF NOT EXISTS recibos_archivos (
     recibo_id       INTEGER PRIMARY KEY REFERENCES recibos(id),
     tipo            TEXT NOT NULL,
     xlsx_bytes      BYTEA NOT NULL,
-    pdf_bytes       BYTEA NOT NULL,
+    pdf_bytes       BYTEA,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS liquidaciones_archivos (
     letra_id        INTEGER PRIMARY KEY REFERENCES creditos(letra),
     xlsx_bytes      BYTEA NOT NULL,
-    pdf_bytes       BYTEA NOT NULL,
+    pdf_bytes       BYTEA,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 """
@@ -177,4 +180,7 @@ MIGRATIONS_POSTGRES: tuple[str, ...] = (
     "ALTER TABLE socios ADD COLUMN IF NOT EXISTS activo INTEGER DEFAULT 1",
     "ALTER TABLE liquidaciones ADD COLUMN IF NOT EXISTS mora_exenta INTEGER DEFAULT 0",
     "ALTER TABLE detalle_recibo ADD COLUMN IF NOT EXISTS papeleria INTEGER DEFAULT 0",
+    # La app de escritorio guarda el xlsx sin pdf (no genera PDF).
+    "ALTER TABLE recibos_archivos ALTER COLUMN pdf_bytes DROP NOT NULL",
+    "ALTER TABLE liquidaciones_archivos ALTER COLUMN pdf_bytes DROP NOT NULL",
 )

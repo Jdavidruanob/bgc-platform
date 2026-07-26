@@ -16,6 +16,7 @@ from coop_contracts.notificador import Notificador
 from telegram import InputFile, Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
+from coop_bot import entorno
 from coop_bot.api.cliente import ApiClient
 from coop_bot.config import Config
 from coop_bot.dialogo.estados import (
@@ -273,7 +274,9 @@ async def _on_timeout_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def enviar_texto(context: ContextTypes.DEFAULT_TYPE, chat_id: int, texto: str) -> None:
-    await context.bot.send_message(chat_id=chat_id, text=texto)
+    # Único embudo de respuestas del bot: aquí se antepone el aviso de entorno
+    # para que ningún mensaje de pruebas pueda confundirse con uno real.
+    await context.bot.send_message(chat_id=chat_id, text=entorno.prefijo() + texto)
 
 
 async def enviar_pdf(
@@ -284,6 +287,8 @@ async def enviar_pdf(
     caption: str | None = None,
 ) -> None:
     documento = InputFile(io.BytesIO(contenido), filename=nombre_archivo)
+    if caption:
+        caption = entorno.prefijo() + caption
     await context.bot.send_document(chat_id=chat_id, document=documento, caption=caption)
 
 

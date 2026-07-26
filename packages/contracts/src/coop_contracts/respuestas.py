@@ -65,6 +65,9 @@ class SalarioRequest(BaseModel):
 class HealthOk(BaseModel):
     status: str = "ok"
     version: str
+    # 'produccion' o 'pruebas'. Permite confirmar desde fuera contra qué base
+    # está escribiendo esta instancia de la API antes de operar con ella.
+    entorno: str = "produccion"
 
 
 class SocioSearchItem(BaseModel):

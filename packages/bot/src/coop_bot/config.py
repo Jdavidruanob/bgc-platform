@@ -23,6 +23,9 @@ class Config:
     # Chat IDs autorizados a hablar con el bot (Álvaro, Mari, y quien esté probando).
     telegram_operador_chat_ids: tuple[int, ...]
     openai_api_key: str
+    # 'produccion' o 'pruebas'. Determina si el bot antepone el aviso de
+    # entorno a sus respuestas (ver coop_bot.entorno).
+    app_env: str = "produccion"
     log_level: str = "INFO"
     whatsapp_cloud_api_token: str | None = None
     whatsapp_phone_number_id: str | None = None
@@ -49,6 +52,7 @@ class Config:
             telegram_bot_token=_req("TELEGRAM_BOT_TOKEN"),
             telegram_operador_chat_ids=chat_ids,
             openai_api_key=_req("OPENAI_API_KEY"),
+            app_env=os.environ.get("APP_ENV") or "produccion",
             log_level=os.environ.get("LOG_LEVEL", "INFO"),
             whatsapp_cloud_api_token=os.environ.get("WHATSAPP_CLOUD_API_TOKEN") or None,
             whatsapp_phone_number_id=os.environ.get("WHATSAPP_PHONE_NUMBER_ID") or None,
