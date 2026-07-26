@@ -74,7 +74,10 @@ CREATE TABLE IF NOT EXISTS detalle_recibo (
     credito_letra   INTEGER,
     nro_cuota       INTEGER,
     monto           INTEGER NOT NULL,
-    abono_mora      INTEGER DEFAULT 0
+    abono_mora      INTEGER DEFAULT 0,
+    -- Papelería cobrada por esta línea (solo aportes). Se guarda para poder
+    -- devolverla exacta al fondo de administración si se elimina el recibo.
+    papeleria       INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS auxiliar (
@@ -171,4 +174,5 @@ MIGRATIONS_POSTGRES: tuple[str, ...] = (
     "ALTER TABLE notificaciones_whatsapp ADD COLUMN IF NOT EXISTS detalle TEXT",
     "ALTER TABLE socios ADD COLUMN IF NOT EXISTS activo INTEGER DEFAULT 1",
     "ALTER TABLE liquidaciones ADD COLUMN IF NOT EXISTS mora_exenta INTEGER DEFAULT 0",
+    "ALTER TABLE detalle_recibo ADD COLUMN IF NOT EXISTS papeleria INTEGER DEFAULT 0",
 )

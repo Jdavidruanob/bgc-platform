@@ -114,12 +114,16 @@ class CombinadoService:
                 sd = ap["socio_data"]
                 monto = ap["monto"]
                 socio_id = int(sd["id"])
+                # La papelería cobrada queda registrada por línea para poder
+                # devolverla exacta si luego se elimina el recibo.
+                papeleria = PAPELERIA_POR_APORTE if es_cobrable(socio_id) else 0
                 cursor.execute(
                     """
-                    INSERT INTO detalle_recibo (recibo_id, tipo_operacion, socio_id, monto)
-                    VALUES (%s, 'aporte', %s, %s)
+                    INSERT INTO detalle_recibo
+                        (recibo_id, tipo_operacion, socio_id, monto, papeleria)
+                    VALUES (%s, 'aporte', %s, %s, %s)
                     """,
-                    (recibo_id, socio_id, monto),
+                    (recibo_id, socio_id, monto, papeleria),
                 )
                 cursor.execute(
                     "UPDATE socios SET saldo = saldo + %s WHERE id = %s",

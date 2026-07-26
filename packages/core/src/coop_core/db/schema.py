@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS detalle_recibo (
     nro_cuota INTEGER,
     monto INTEGER NOT NULL,
     abono_mora INTEGER DEFAULT 0,
+    papeleria INTEGER DEFAULT 0,
     FOREIGN KEY (recibo_id) REFERENCES recibos(id),
     FOREIGN KEY (socio_id) REFERENCES socios(id)
 );
