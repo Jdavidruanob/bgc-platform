@@ -38,13 +38,15 @@ class RecibosArchivosRepository:
         cursor = self._conn.cursor()
         cursor.execute("SELECT pdf_bytes FROM recibos_archivos WHERE recibo_id = %s", (recibo_id,))
         row = cursor.fetchone()
-        return bytes(row[0]) if row else None
+        # pdf_bytes puede venir NULL: los recibos creados desde la app de
+        # escritorio guardan solo el Excel.
+        return bytes(row[0]) if row and row[0] is not None else None
 
     def obtener_xlsx(self, recibo_id: int) -> bytes | None:
         cursor = self._conn.cursor()
         cursor.execute("SELECT xlsx_bytes FROM recibos_archivos WHERE recibo_id = %s", (recibo_id,))
         row = cursor.fetchone()
-        return bytes(row[0]) if row else None
+        return bytes(row[0]) if row and row[0] is not None else None
 
     def listar(
         self, desde: str | None = None, hasta: str | None = None, limit: int = 100
@@ -96,10 +98,10 @@ class LiquidacionesArchivosRepository:
         cursor = self._conn.cursor()
         cursor.execute("SELECT pdf_bytes FROM liquidaciones_archivos WHERE letra_id = %s", (letra_id,))
         row = cursor.fetchone()
-        return bytes(row[0]) if row else None
+        return bytes(row[0]) if row and row[0] is not None else None
 
     def obtener_xlsx(self, letra_id: int) -> bytes | None:
         cursor = self._conn.cursor()
         cursor.execute("SELECT xlsx_bytes FROM liquidaciones_archivos WHERE letra_id = %s", (letra_id,))
         row = cursor.fetchone()
-        return bytes(row[0]) if row else None
+        return bytes(row[0]) if row and row[0] is not None else None

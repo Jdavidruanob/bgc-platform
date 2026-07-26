@@ -1,3 +1,4 @@
+import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -5,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from coop_api import entorno
 from coop_api.postgres_schema import CONFIG_DEFAULTS, MIGRATIONS_POSTGRES, SCHEMA_POSTGRES
 from coop_api.routers import (
     caja,
@@ -21,6 +23,11 @@ from coop_api.routers import (
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     db_url = os.environ.get("DATABASE_URL", "")
+    logging.getLogger(__name__).warning(
+        "coop-api arrancando · entorno=%s · base=%s",
+        entorno.get_entorno(),
+        entorno.descripcion_conexion(),
+    )
     if db_url:
         import psycopg
 

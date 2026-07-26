@@ -132,11 +132,12 @@ CREATE TABLE IF NOT EXISTS audit_log (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- pdf_bytes admite NULL: la app de escritorio guarda solo el xlsx.
 CREATE TABLE IF NOT EXISTS recibos_archivos (
     recibo_id INTEGER PRIMARY KEY,
     tipo TEXT NOT NULL,
     xlsx_bytes BLOB NOT NULL,
-    pdf_bytes BLOB NOT NULL,
+    pdf_bytes BLOB,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (recibo_id) REFERENCES recibos(id)
 );
@@ -144,7 +145,7 @@ CREATE TABLE IF NOT EXISTS recibos_archivos (
 CREATE TABLE IF NOT EXISTS liquidaciones_archivos (
     letra_id INTEGER PRIMARY KEY,
     xlsx_bytes BLOB NOT NULL,
-    pdf_bytes BLOB NOT NULL,
+    pdf_bytes BLOB,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (letra_id) REFERENCES creditos(letra)
 );
