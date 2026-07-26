@@ -16,6 +16,27 @@ class RecibosRepository:
         row = cursor.fetchone()
         return int(row[0])
 
+    def add_detalle_salario(self, recibo_id: int, socio_id: int, monto: int) -> None:
+        """Línea de detalle de un pago de salario.
+
+        No aporta información nueva —el monto ya queda en el auxiliar— pero es
+        lo que permite eliminar el recibo después: el servicio de reversión se
+        niega a tocar un recibo sin detalle ("El recibo no tiene operaciones
+        registradas"), así que sin esta fila un salario pagado desde el bot
+        quedaría imposible de deshacer.
+
+        Va a nombre del tesorero, igual que el recibo, pero su saldo NO se toca:
+        la plata es del administrador, no un aporte del socio.
+        """
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO detalle_recibo (recibo_id, tipo_operacion, socio_id, monto)
+            VALUES (%s, 'salario', %s, %s)
+            """,
+            (recibo_id, socio_id, monto),
+        )
+
     def find_by_id(self, recibo_id: int) -> dict[str, Any] | None:
         cursor = self._conn.cursor()
         cursor.execute("SELECT id, socio_id, fecha FROM recibos WHERE id = %s", (recibo_id,))

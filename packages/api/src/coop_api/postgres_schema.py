@@ -160,6 +160,8 @@ CONFIG_DEFAULTS = {
     "total_admin": "0",
     # Fondo de mora cobrada, separado de la papelería (total_admin).
     "total_mora": "0",
+    # Acumulado de salarios pagados al administrador (gasto, no fondo).
+    "total_salarios": "0",
     "porcentaje_mora": "0.02",
     # Salario del administrador (salario mínimo vigente). Valor guardado que el
     # operador confirma o modifica al pagar. Se siembra con el mínimo de 2025.

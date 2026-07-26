@@ -505,10 +505,16 @@ def pagar_salario(
         return not_found("SOCIO_NO_ENCONTRADO", f"No existe el socio tesorero (ID {tesorero_id}).")
 
     recibo_id = recibos.create(tesorero_id)
+    recibos.add_detalle_salario(recibo_id, tesorero_id, body.monto)
     saldo_nuevo = config.get_int("saldo_en_caja") - body.monto
     config.set("saldo_en_caja", str(saldo_nuevo))
     # Guardar el salario confirmado para la próxima vez.
     config.set("salario_minimo", str(body.monto))
+    # Acumulado de todo lo pagado en salarios, para saber a fin de año cuánto
+    # se destinó a esto sin recorrer el histórico. Lo lee el tablero de datos de
+    # la app; se acumula aquí también para que el total no dependa de si el
+    # salario se pagó desde el bot o desde la app.
+    config.set("total_salarios", str(config.get_int("total_salarios") + body.monto))
     fecha_str = get_hoy_str()
     auxiliar.add(
         fecha=fecha_str,
