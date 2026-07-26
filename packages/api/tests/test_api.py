@@ -507,6 +507,53 @@ def test_pago_salario_descuenta_caja_y_guarda_valor(client: TestClient, socio_pe
     assert client.get("/config/salario", headers=AUTH).json()["salario_guardado"] == 1500000
 
 
+def test_pago_salario_acumula_total_y_deja_detalle(client: TestClient, socio_pedro, db_conn):
+    """El salario suma a `total_salarios` y escribe su línea de detalle.
+
+    El acumulado es lo que permite saber a fin de año cuánto se destinó a
+    salarios. La línea de detalle es lo que permite eliminar el recibo después:
+    sin ella, el servicio de reversión de la app lo rechaza por "no tiene
+    operaciones registradas".
+    """
+    from coop_core.repositories.config_repo import ConfigRepository
+
+    cfg = ConfigRepository(db_conn)
+    cfg.set("tesorero_socio_id", str(socio_pedro))
+    cfg.set("saldo_en_caja", "5000000")
+    cfg.set("total_salarios", "0")
+    db_conn.commit()
+
+    r = client.post(
+        "/operaciones/salario",
+        json={"mes": "Julio", "monto": 1200000},
+        headers=_idem(),
+    )
+    assert r.status_code == 201
+    recibo_id = r.json()["recibo_id"]
+
+    assert ConfigRepository(db_conn).get_int("total_salarios") == 1200000
+
+    cursor = db_conn.cursor()
+    cursor.execute(
+        "SELECT tipo_operacion, socio_id, monto FROM detalle_recibo WHERE recibo_id = %s",
+        (recibo_id,),
+    )
+    filas = cursor.fetchall()
+    assert len(filas) == 1
+    assert filas[0][0] == "salario"
+    assert filas[0][1] == socio_pedro
+    assert filas[0][2] == 1200000
+
+    # Un segundo pago se acumula sobre el primero, no lo reemplaza.
+    r2 = client.post(
+        "/operaciones/salario",
+        json={"mes": "Agosto", "monto": 1200000},
+        headers=_idem(),
+    )
+    assert r2.status_code == 201
+    assert ConfigRepository(db_conn).get_int("total_salarios") == 2400000
+
+
 def test_crear_credito_sin_idempotency_key(client: TestClient, socio_pedro):
     r = client.post(
         "/operaciones/creditos",

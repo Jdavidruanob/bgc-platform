@@ -505,6 +505,7 @@ def pagar_salario(
         return not_found("SOCIO_NO_ENCONTRADO", f"No existe el socio tesorero (ID {tesorero_id}).")
 
     recibo_id = recibos.create(tesorero_id)
+    recibos.add_detalle_salario(recibo_id, tesorero_id, body.monto)
     saldo_nuevo = config.get_int("saldo_en_caja") - body.monto
     config.set("saldo_en_caja", str(saldo_nuevo))
     # Guardar el salario confirmado para la próxima vez.
