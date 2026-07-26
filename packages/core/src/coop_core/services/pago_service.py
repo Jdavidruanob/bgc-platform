@@ -89,7 +89,7 @@ class PagoService:
             recibo_id = int(cursor.fetchone()[0])
 
             saldo_caja = self._config.get_int("saldo_en_caja")
-            total_admin = self._config.get_int("total_admin")
+            fondo_mora = self._config.get_int("total_mora")
             mora_total = 0
             reporte_global: dict[str, list[str]] = {}
 
@@ -109,7 +109,7 @@ class PagoService:
 
             self._config.set("saldo_en_caja", str(saldo_caja))
             if mora_total > 0:
-                self._config.set("total_admin", str(total_admin + mora_total))
+                self._config.set("total_mora", str(fondo_mora + mora_total))
             self._conn.commit()
 
             pagos_list = list(pagos_para_recibo.values())

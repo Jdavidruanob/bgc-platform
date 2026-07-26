@@ -155,6 +155,8 @@ CREATE TABLE IF NOT EXISTS liquidaciones_archivos (
 CONFIG_DEFAULTS = {
     "saldo_en_caja": "0",
     "total_admin": "0",
+    # Fondo de mora cobrada, separado de la papelería (total_admin).
+    "total_mora": "0",
     "porcentaje_mora": "0.02",
     # Salario del administrador (salario mínimo vigente). Valor guardado que el
     # operador confirma o modifica al pagar. Se siembra con el mínimo de 2025.

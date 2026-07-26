@@ -28,13 +28,11 @@ class CajaService:
         return self.get_papeleria()
 
     def get_mora_acumulada(self) -> int:
-        """Total de abonos por mora cobrados a lo largo del tiempo."""
-        if self._recibos is None:
-            return 0
-        return self._recibos.sum_abono_mora()
+        """Fondo de mora cobrada acumulado (config 'total_mora')."""
+        return self._config.get_int("total_mora")
 
     def get_administracion_total(self) -> int:
-        """Administración = papelería + mora acumulada (como el BGC-software)."""
+        """Administración = papelería + mora acumulada."""
         return self.get_papeleria() + self.get_mora_acumulada()
 
     def get_porcentaje_mora(self) -> float:
@@ -54,6 +52,10 @@ class CajaService:
             id_credito=None,
         )
 
-    def set_admin_config(self, new_papeleria: int, new_mora: float) -> None:
+    def set_admin_config(
+        self, new_papeleria: int, new_mora: float, new_fondo_mora: int | None = None
+    ) -> None:
         self._config.set("total_admin", str(new_papeleria))
         self._config.set("porcentaje_mora", str(new_mora))
+        if new_fondo_mora is not None:
+            self._config.set("total_mora", str(new_fondo_mora))
