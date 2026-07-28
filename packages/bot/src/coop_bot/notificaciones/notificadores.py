@@ -12,6 +12,7 @@ event loop al llamarlas.
 
 from __future__ import annotations
 
+import logging
 import urllib.parse
 from typing import Any
 
@@ -23,6 +24,8 @@ from coop_contracts.notificador import (
 )
 
 from coop_bot.config import Config
+
+logger = logging.getLogger(__name__)
 
 
 class CloudApiNotificador:
@@ -231,7 +234,18 @@ def construir_notificador(config: Config) -> Notificador:
             plantilla=config.whatsapp_plantilla,
             plantilla_idioma=config.whatsapp_plantilla_idioma,
         )
+        logger.info(
+            "Notificador WhatsApp: Cloud API + fallback wa.me (phone_number_id=%s, plantilla=%s)",
+            config.whatsapp_phone_number_id,
+            config.whatsapp_plantilla or "(ninguna, texto libre)",
+        )
         return NotificadorConFallback(primario, fallback)
+    logger.warning(
+        "Notificador WhatsApp: SOLO fallback wa.me (no envía nada por sí solo) — "
+        "faltan credenciales Meta. token=%s, phone_number_id=%s",
+        "presente" if config.whatsapp_cloud_api_token else "FALTANTE",
+        "presente" if config.whatsapp_phone_number_id else "FALTANTE",
+    )
     return fallback
 
 
