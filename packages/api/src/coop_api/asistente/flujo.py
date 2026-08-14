@@ -67,31 +67,30 @@ def _atender_boton(
 
     if boton_id == "menu:aportes":
         saldo_fmt = format_miles_colombian_int(int(socio.get("saldo") or 0))
-        texto = copy.saldo_de_aportes(socio, saldo_fmt) + "\n\n¿Deseas consultar algo más?"
-        _enviar_menu(cliente, numero_meta, texto)
+        _enviar_respuesta_con_seguimiento(cliente, numero_meta, copy.saldo_de_aportes(socio, saldo_fmt))
         return
 
     if boton_id == "menu:creditos":
         letras = consultas.letras_activas(db, socio_id)
         if not letras:
-            _enviar_menu(cliente, numero_meta, copy.sin_creditos_activos(socio))
+            _enviar_respuesta_con_seguimiento(cliente, numero_meta, copy.sin_creditos_activos(socio))
             return
         botones = [Boton(id=i, titulo=t) for i, t in copy.BOTONES_LIQUIDACION_SI_NO]
         cliente.enviar_botones(numero_meta, copy.mis_creditos(letras), botones)
         return
 
     if boton_id == "menu:pagos":
-        _enviar_menu(cliente, numero_meta, _texto_proximos_pagos(db, socio, hoy))
+        _enviar_respuesta_con_seguimiento(cliente, numero_meta, _texto_proximos_pagos(db, socio, hoy))
         return
 
     if boton_id == "liq:no":
-        _enviar_menu(cliente, numero_meta, copy.liquidacion_no_gracias(socio))
+        _enviar_respuesta_con_seguimiento(cliente, numero_meta, copy.liquidacion_no_gracias(socio))
         return
 
     if boton_id == "liq:si":
         letras = consultas.letras_activas(db, socio_id)
         if not letras:
-            _enviar_menu(cliente, numero_meta, copy.sin_creditos_activos(socio))
+            _enviar_respuesta_con_seguimiento(cliente, numero_meta, copy.sin_creditos_activos(socio))
             return
         if len(letras) == 1:
             _enviar_liquidacion(db, cliente, background, numero_meta, letras[0], hoy)
@@ -102,9 +101,9 @@ def _atender_boton(
     if boton_id == "liq:todos":
         letras = consultas.letras_activas(db, socio_id)
         if not letras:
-            _enviar_menu(cliente, numero_meta, copy.sin_creditos_activos(socio))
+            _enviar_respuesta_con_seguimiento(cliente, numero_meta, copy.sin_creditos_activos(socio))
             return
-        cliente.enviar_texto(numero_meta, copy.preparando_liquidacion())
+        _enviar_respuesta_con_seguimiento(cliente, numero_meta, copy.preparando_liquidacion())
         for letra_id in letras:
             _enviar_liquidacion(db, cliente, background, numero_meta, letra_id, hoy, avisar=False)
         return
@@ -118,6 +117,14 @@ def _atender_boton(
             _enviar_menu(cliente, numero_meta, copy.opcion_no_reconocida(socio))
             return
         _enviar_liquidacion(db, cliente, background, numero_meta, letra_elegida, hoy)
+        return
+
+    if boton_id == "fin:otra":
+        _enviar_menu(cliente, numero_meta, copy.pregunta_otra_consulta(socio))
+        return
+
+    if boton_id == "fin:no":
+        cliente.enviar_texto(numero_meta, copy.despedida(socio))
         return
 
     _enviar_menu(cliente, numero_meta, copy.opcion_no_reconocida(socio))
@@ -153,10 +160,10 @@ def _enviar_liquidacion(
 ) -> None:
     resultado = preparar_datos_liquidacion(db, letra_id)
     if isinstance(resultado, ErrorLiquidacion):
-        cliente.enviar_texto(numero_meta, copy.liquidacion_no_disponible())
+        _enviar_respuesta_con_seguimiento(cliente, numero_meta, copy.liquidacion_no_disponible())
         return
     if avisar:
-        cliente.enviar_texto(numero_meta, copy.preparando_liquidacion())
+        _enviar_respuesta_con_seguimiento(cliente, numero_meta, copy.preparando_liquidacion())
     background.add_task(
         enviar_liquidacion_pdf, cliente, numero_meta, letra_id, resultado, hoy.strftime("%d/%m/%Y")
     )
@@ -165,6 +172,14 @@ def _enviar_liquidacion(
 def _enviar_menu(cliente: ClienteWhatsApp, numero_meta: str, texto: str) -> None:
     botones = [Boton(id=i, titulo=t) for i, t in copy.MENU_PRINCIPAL]
     cliente.enviar_botones(numero_meta, texto, botones)
+
+
+def _enviar_respuesta_con_seguimiento(cliente: ClienteWhatsApp, numero_meta: str, texto: str) -> None:
+    """Cierre estándar de cada respuesta: además de contestar, ofrece seguir
+    consultando o despedirse — así la conversación nunca se queda en el aire."""
+    cuerpo = f"{texto}\n\n{copy.pregunta_algo_mas()}"
+    botones = [Boton(id=i, titulo=t) for i, t in copy.BOTONES_ALGO_MAS]
+    cliente.enviar_botones(numero_meta, cuerpo, botones)
 
 
 def _fecha_larga(fecha_iso: str) -> str:

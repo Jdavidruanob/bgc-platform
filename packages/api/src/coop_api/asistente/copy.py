@@ -21,6 +21,13 @@ BOTONES_LIQUIDACION_SI_NO: list[tuple[str, str]] = [
     ("liq:no", "No, gracias"),
 ]
 
+# Se ofrece después de cada respuesta: permite seguir consultando o cerrar
+# la conversación con una despedida en vez de dejar caer la respuesta sola.
+BOTONES_ALGO_MAS: list[tuple[str, str]] = [
+    ("fin:otra", "Sí, algo más"),
+    ("fin:no", "No, gracias"),
+]
+
 
 def primer_nombre(nombres: Any) -> str:
     partes = str(nombres or "").strip().split()
@@ -56,6 +63,21 @@ def opcion_no_reconocida(socio: dict[str, Any]) -> str:
     return (
         f"Perdón, {primer_nombre(socio.get('nombres'))}, no reconocí esa opción 🙈\n\n"
         "Te dejo el menú de nuevo:"
+    )
+
+
+def pregunta_algo_mas() -> str:
+    return "¿Deseas consultar algo más?"
+
+
+def pregunta_otra_consulta(socio: dict[str, Any]) -> str:
+    return f"Perfecto, {primer_nombre(socio.get('nombres'))}. ¿Qué más deseas consultar?"
+
+
+def despedida(socio: dict[str, Any]) -> str:
+    return (
+        f"Con mucho gusto, {primer_nombre(socio.get('nombres'))} 🙌\n\n"
+        "Quedo a tu servicio para cuando me necesites. ¡Que tengas un excelente día! ☀️"
     )
 
 

@@ -247,7 +247,7 @@ def test_menu_creditos_sin_creditos(client: TestClient, db_conn: Any, cliente_wa
     assert r.status_code == 200
     _, texto, botones = cliente_wa.botones[0]
     assert "#" not in texto
-    assert [b.id for b in botones] == ["menu:aportes", "menu:creditos", "menu:pagos"]
+    assert [b.id for b in botones] == ["fin:otra", "fin:no"]
 
 
 def test_menu_creditos_uno_activo(client: TestClient, db_conn: Any, cliente_wa: Any) -> None:
@@ -432,3 +432,50 @@ def test_excepcion_interna_sigue_devolviendo_200(
     monkeypatch.setattr("coop_api.routers.webhook_whatsapp.flujo.atender", _explota)
     r = _post(client, _sobre([_msg_texto(NUM_PEDRO_META, "Hola")]))
     assert r.status_code == 200
+
+
+# ── Seguimiento tras responder y despedida ───────────────────────────────────
+
+
+def test_respuesta_ofrece_seguir_o_despedirse(client: TestClient, db_conn: Any, cliente_wa: Any) -> None:
+    _crear_socio(db_conn, "Pedro Antonio", "Gómez Ruiz", "3001234567", NUM_PEDRO_E164, saldo=50_000)
+    r = _post(client, _sobre([_msg_boton(NUM_PEDRO_META, "menu:aportes")]))
+    assert r.status_code == 200
+    _, texto, botones = cliente_wa.botones[0]
+    assert "50.000" in texto
+    assert "algo más" in texto.lower()
+    assert [b.id for b in botones] == ["fin:otra", "fin:no"]
+
+
+def test_fin_otra_vuelve_al_menu_principal(client: TestClient, db_conn: Any, cliente_wa: Any) -> None:
+    _crear_socio(db_conn, "Pedro Antonio", "Gómez Ruiz", "3001234567", NUM_PEDRO_E164)
+    r = _post(client, _sobre([_msg_boton(NUM_PEDRO_META, "fin:otra")]))
+    assert r.status_code == 200
+    _, texto, botones = cliente_wa.botones[0]
+    assert "Pedro" in texto
+    assert [b.id for b in botones] == ["menu:aportes", "menu:creditos", "menu:pagos"]
+
+
+def test_fin_no_se_despide_sin_botones(client: TestClient, db_conn: Any, cliente_wa: Any) -> None:
+    _crear_socio(db_conn, "Pedro Antonio", "Gómez Ruiz", "3001234567", NUM_PEDRO_E164)
+    r = _post(client, _sobre([_msg_boton(NUM_PEDRO_META, "fin:no")]))
+    assert r.status_code == 200
+    assert cliente_wa.botones == []
+    assert len(cliente_wa.textos) == 1
+    _, texto = cliente_wa.textos[0]
+    assert "Pedro" in texto
+    assert "servicio" in texto.lower()
+
+
+def test_liq_si_un_credito_ofrece_seguimiento(
+    client: TestClient, db_conn: Any, cliente_wa: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("coop_api.asistente.liquidacion.xlsx_a_pdf", lambda _xlsx: b"%PDF-1.4 fake")
+    sid = _crear_socio(db_conn, "Pedro Antonio", "Gómez Ruiz", "3001234567", NUM_PEDRO_E164)
+    _crear_credito(db_conn, [sid])
+    r = _post(client, _sobre([_msg_boton(NUM_PEDRO_META, "liq:si")]))
+    assert r.status_code == 200
+    assert len(cliente_wa.documentos) == 1
+    _, texto, botones = cliente_wa.botones[0]
+    assert "preparando" in texto.lower()
+    assert [b.id for b in botones] == ["fin:otra", "fin:no"]
