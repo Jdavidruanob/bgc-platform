@@ -144,6 +144,14 @@ class ApiClient:
         if response.is_error:
             self._lanzar_error(response)
 
+    async def generar_recordatorios_mora(self) -> int:
+        """Dispara el job diario de recordatorios de cuota próxima a vencer
+        (ver ADR-010). Devuelve cuántas notificaciones quedaron encoladas."""
+        response = await self._pedir(lambda: self._client.post("/recordatorios/cuotas-proximas"))
+        if response.is_error:
+            self._lanzar_error(response)
+        return int(response.json()["encoladas"])
+
     async def get_borradores(self, documento_tipo: str, documento_id: int) -> BorradoresResponse:
         return await self._get(
             f"/notificaciones/borradores/{documento_tipo}/{documento_id}", {}, BorradoresResponse

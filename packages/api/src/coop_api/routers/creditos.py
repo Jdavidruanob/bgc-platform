@@ -9,7 +9,7 @@ from coop_contracts.respuestas import (
 from coop_core.repositories.creditos_repo import CreditosRepository
 from coop_core.repositories.liquidaciones_repo import LiquidacionesRepository
 from coop_core.repositories.socios_repo import SociosRepository
-from coop_core.services.amortization import calculate_mora
+from coop_core.services.amortization import build_cuotas_pendientes_detalle
 from coop_core.utils.fecha import get_hoy
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse, Response
@@ -75,28 +75,20 @@ def get_cuotas_pendientes(
     hoy = get_hoy()
 
     pendientes = liquidaciones_repo.find_pending(letra_id)
-    cuotas: list[CuotaPendiente] = []
-    deuda_total = 0
-
-    for c in pendientes:
-        mora = calculate_mora(str(c["fecha_vencimiento"]), hoy, int(c["valor_cuota"]), tasa_mora)
-        from datetime import datetime
-
-        fv = datetime.strptime(str(c["fecha_vencimiento"]), "%Y-%m-%d").date()
-        estado = "vencida" if fv < hoy else ("vigente" if fv == hoy else "futuro")
-        cuota_total = int(c["cuota_mensual"]) + mora
-        deuda_total += cuota_total
-        cuotas.append(
-            CuotaPendiente(
-                nro_cuota=int(c["nro_cuota"]),
-                fecha_vencimiento=str(c["fecha_vencimiento"]),
-                valor_cuota=int(c["valor_cuota"]),
-                interes_mes=int(c["interes_mes"]),
-                cuota_mensual=int(c["cuota_mensual"]),
-                mora_estimada=mora,
-                estado=estado,
-            )
+    detalle = build_cuotas_pendientes_detalle(pendientes, hoy, tasa_mora)
+    cuotas = [
+        CuotaPendiente(
+            nro_cuota=d["nro_cuota"],
+            fecha_vencimiento=d["fecha_vencimiento"],
+            valor_cuota=d["valor_cuota"],
+            interes_mes=d["interes_mes"],
+            cuota_mensual=d["cuota_mensual"],
+            mora_estimada=d["mora_estimada"],
+            estado=d["estado"],
         )
+        for d in detalle
+    ]
+    deuda_total = sum(d["cuota_total"] for d in detalle)
 
     return CuotasPendientesResponse(
         letra_id=letra_id,

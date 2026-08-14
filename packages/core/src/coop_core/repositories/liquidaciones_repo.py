@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from dateutil.relativedelta import relativedelta
@@ -59,6 +59,42 @@ class LiquidacionesRepository:
         )
         cols = [d[0] for d in cursor.description]
         return [dict(zip(cols, row, strict=False)) for row in cursor.fetchall()]
+
+    def find_cuotas_por_avisar_mora(self, hoy: date, dias_gracia: int) -> list[dict[str, Any]]:
+        """Cuotas pendientes que ya vencieron (o vencen hoy) pero siguen dentro
+        de los `dias_gracia` días de gracia antes de que se les cobre mora
+        (ver `calculate_mora`), y que aún no fueron avisadas. Una cuota que ya
+        pasó esos días de gracia no aparece aquí: ya entró en mora, avisarla
+        ahora llegaría tarde.
+
+        Corriendo a diario, cada cuota entra en este rango una sola vez (el
+        día que vence), así que en régimen normal el aviso sale justo ese
+        día; si el job arranca por primera vez con cuotas que vencieron hace
+        pocos días pero aún no entran en mora, también las alcanza a avisar
+        (barrido inicial)."""
+        limite_inferior = (hoy - timedelta(days=dias_gracia)).strftime("%Y-%m-%d")
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, credito_letra, nro_cuota, fecha_vencimiento, valor_cuota
+            FROM liquidaciones
+            WHERE fecha_pago IS NULL
+              AND notif_prev_enviada = 0
+              AND fecha_vencimiento > %s
+              AND fecha_vencimiento <= %s
+            ORDER BY fecha_vencimiento ASC
+            """,
+            (limite_inferior, hoy.strftime("%Y-%m-%d")),
+        )
+        cols = [d[0] for d in cursor.description]
+        return [dict(zip(cols, row, strict=False)) for row in cursor.fetchall()]
+
+    def marcar_notif_prev_enviada(self, liquidacion_id: int) -> None:
+        cursor = self._conn.cursor()
+        cursor.execute(
+            "UPDATE liquidaciones SET notif_prev_enviada = 1 WHERE id = %s",
+            (liquidacion_id,),
+        )
 
     def get_current_debt(self, letra_id: int) -> int:
         cursor = self._conn.cursor()

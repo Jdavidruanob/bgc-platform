@@ -1,11 +1,15 @@
+import json
+
 from coop_bot.adaptadores.telegram import _texto_aviso_operador
 from coop_bot.api.cliente import ApiClient
 from coop_bot.notificaciones.procesador import (
     EnvioRealizado,
     ResumenProcesamiento,
+    _procesar_una,
     procesar_pendientes,
 )
 from coop_contracts.notificador import MockNotificador, ResultadoEnvio
+from coop_contracts.respuestas import NotificacionPendiente
 
 
 class _NotificadorQueFalla:
@@ -120,3 +124,64 @@ async def test_excepcion_del_notificador_se_captura_y_marca_fallida(
 
     assert resumen.fallidas == 1
     assert any("boom" in error for error in resumen.errores)
+
+
+# ── Recordatorios de cuota próxima ──────────────────────────────────────────
+
+
+class _ClienteSinDescargas:
+    """Stub de ApiClient: solo implementa lo que necesita `_marcar` (PATCH). Los
+    recordatorios no tienen documento adjunto, así que `_procesar_una` nunca
+    debería intentar descargar nada a través de este cliente."""
+
+    def __init__(self) -> None:
+        self.patches: list[tuple[int, str, str | None]] = []
+
+    async def patch_notificacion(self, notificacion_id: int, estado: str, error: str | None = None) -> None:
+        self.patches.append((notificacion_id, estado, error))
+
+
+def _notificacion_recordatorio() -> NotificacionPendiente:
+    return NotificacionPendiente(
+        id=42,
+        socio_id=7,
+        numero_e164="+573112223344",
+        texto="Hola, Pedro 👋\n\nTe informamos que la cuota #3 de tu crédito con letra #12 ...",
+        fecha_creacion="2026-08-13T00:00:00",
+        socio_nombre="Pedro Gómez",
+        detalle=json.dumps(
+            {
+                "numero_cuota": "3",
+                "numero_letra": "12",
+                "fecha_pago_cuota": "13/08/2026",
+                "fecha_mora": "18/08/2026",
+                "monto_mora": "$2.000",
+            }
+        ),
+        documento_tipo="recordatorio_cuota",
+        documento_id=99,
+    )
+
+
+async def test_recordatorio_de_cuota_usa_enviar_recordatorio_con_los_params() -> None:
+    notificador = MockNotificador()
+    cliente = _ClienteSinDescargas()
+    resumen = ResumenProcesamiento()
+
+    await _procesar_una(cliente, notificador, _notificacion_recordatorio(), resumen)
+
+    assert resumen.enviadas == 1
+    assert cliente.patches == [(42, "enviada", None)]
+    assert len(notificador.recordatorios_enviados) == 1
+    enviado = notificador.recordatorios_enviados[0]
+    assert enviado["numero_e164"] == "+573112223344"
+    assert enviado["plantilla"] == {
+        "nombre": "Pedro",
+        "numero_cuota": "3",
+        "numero_letra": "12",
+        "fecha_pago_cuota": "13/08/2026",
+        "fecha_mora": "18/08/2026",
+        "monto_mora": "$2.000",
+    }
+    # No debe pasar por el camino de documento: ni recibo ni liquidación.
+    assert notificador.documentos_enviados == []

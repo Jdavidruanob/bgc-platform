@@ -10,10 +10,11 @@ notificación puntual no aborta el procesamiento del resto de la cola.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from dataclasses import dataclass, field
 
-from coop_contracts.notificador import Notificador, ParamsPlantilla
+from coop_contracts.notificador import Notificador, ParamsPlantilla, ParamsRecordatorio
 from coop_contracts.respuestas import NotificacionPendiente
 
 from coop_bot.api.cliente import ApiClient, ApiError
@@ -79,6 +80,13 @@ async def _procesar_una(
                 nombre_archivo,
                 _params_plantilla(notificacion),
             )
+        elif notificacion.documento_tipo == "recordatorio_cuota":
+            resultado = await asyncio.to_thread(
+                notificador.enviar_recordatorio,
+                notificacion.numero_e164,
+                notificacion.texto,
+                _params_recordatorio(notificacion),
+            )
         else:
             resultado = await asyncio.to_thread(
                 notificador.enviar, notificacion.numero_e164, notificacion.texto
@@ -103,6 +111,9 @@ async def _procesar_una(
         await _marcar(cliente, notificacion.id, "fallida", resultado.error, resumen)
 
 
+_DOCUMENTO_POR_TIPO = {"recibo": "recibo", "liquidacion": "liquidación"}
+
+
 def _params_plantilla(notificacion: NotificacionPendiente) -> ParamsPlantilla | None:
     """Variables de la plantilla de Meta. None si la notificación no trae el
     resumen de una línea (notificaciones viejas, anteriores a la plantilla):
@@ -111,7 +122,33 @@ def _params_plantilla(notificacion: NotificacionPendiente) -> ParamsPlantilla | 
         return None
     partes = notificacion.socio_nombre.strip().split()
     nombre = partes[0].capitalize() if partes else "socio"
-    return ParamsPlantilla(nombre=nombre, detalle=notificacion.detalle)
+    documento = _DOCUMENTO_POR_TIPO.get(notificacion.documento_tipo or "", "recibo")
+    return ParamsPlantilla(nombre=nombre, documento=documento)
+
+
+def _params_recordatorio(notificacion: NotificacionPendiente) -> ParamsRecordatorio | None:
+    """Variables del recordatorio de mora próxima. `detalle` guarda un JSON
+    de una sola línea con los datos de la cuota (ver `recordatorios_wire.py`
+    en la API). None si falta o no se puede leer (no debería pasar para este
+    tipo, pero así el procesador nunca revienta): en ese caso se manda como
+    texto libre."""
+    if not notificacion.detalle:
+        return None
+    try:
+        datos = json.loads(notificacion.detalle)
+    except ValueError:
+        logger.warning("detalle de la notificación %s no es JSON válido", notificacion.id)
+        return None
+    partes = notificacion.socio_nombre.strip().split()
+    nombre = partes[0].capitalize() if partes else "socio"
+    return ParamsRecordatorio(
+        nombre=nombre,
+        numero_cuota=str(datos.get("numero_cuota", "")),
+        numero_letra=str(datos.get("numero_letra", "")),
+        fecha_pago_cuota=str(datos.get("fecha_pago_cuota", "")),
+        fecha_mora=str(datos.get("fecha_mora", "")),
+        monto_mora=str(datos.get("monto_mora", "")),
+    )
 
 
 async def _descargar_documento(

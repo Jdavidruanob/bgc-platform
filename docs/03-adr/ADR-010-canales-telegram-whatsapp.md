@@ -2,7 +2,8 @@
 
 **Estado:** Decidido  
 **Fecha:** 2026-07-20  
-**Reemplaza:** ADR-004 (que planteaba un solo canal con adaptador)
+**Reemplaza:** ADR-004 (que planteaba un solo canal con adaptador)  
+**Parcialmente reemplazado por:** ADR-011 (agrega un asistente de solo lectura para socios; ver nota en la sección "Canal de salida" más abajo)
 
 ---
 
@@ -33,7 +34,7 @@ Uso exclusivo del tesorero (un solo usuario). Aquí vive todo el flujo conversac
 Canal de notificación a los socios. Sin diálogo, sin estado, sin IA:
 - Envía recibos en PDF al/los socios involucrados en cada operación.
 - Envía recordatorios de cuota próxima/vencida (job programado).
-- Si un socio responde, se ignora o se responde con mensaje fijo ("Consulte al tesorero").
+- Si un socio responde, se ignora o se responde con mensaje fijo ("Consulte al tesorero"). **Actualizado por ADR-011:** cuando el socio escribe primero, se abre además un asistente de solo lectura y sin IA (menú de botones fijo) que responde con su saldo de aportes, sus créditos y sus próximos pagos — nunca datos de otro socio. Fuera de ese menú, sigue aplicando el mensaje fijo.
 
 **Restricciones operativas aceptadas:**
 - Cuenta sin verificar por Meta: límite de 250 destinatarios únicos por 24 horas. Con ~50 socios, sobra.

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 import logging
+from datetime import time, timedelta, timezone
 from typing import cast
 
 from coop_contracts.notificador import Notificador
@@ -17,7 +18,7 @@ from telegram import InputFile, Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from coop_bot import entorno
-from coop_bot.api.cliente import ApiClient
+from coop_bot.api.cliente import ApiClient, ApiError
 from coop_bot.config import Config
 from coop_bot.dialogo.estados import (
     TIMEOUT_SEGUNDOS,
@@ -34,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 _CLAVE_SESION = "sesion"
 _INTERVALO_NOTIFICACIONES_SEGUNDOS = 60
+# Colombia no tiene horario de verano: UTC-5 fijo todo el año.
+_HORA_RECORDATORIOS_MORA = time(hour=9, minute=0, tzinfo=timezone(timedelta(hours=-5)))
 
 _SALUDOS = {
     "hola",
@@ -112,6 +115,11 @@ def registrar_jobs(application: Application) -> None:
         first=_INTERVALO_NOTIFICACIONES_SEGUNDOS,
         name="procesar_notificaciones",
     )
+    application.job_queue.run_daily(
+        _on_generar_recordatorios_mora,
+        time=_HORA_RECORDATORIOS_MORA,
+        name="generar_recordatorios_mora",
+    )
 
 
 async def _on_procesar_notificaciones(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -129,6 +137,20 @@ async def _on_procesar_notificaciones(context: ContextTypes.DEFAULT_TYPE) -> Non
     if aviso:
         for chat_id in _config(context).telegram_operador_chat_ids:
             await enviar_texto(context, chat_id, aviso)
+
+
+async def _on_generar_recordatorios_mora(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Encola los recordatorios de mora próxima (cuotas que hoy cumplen su
+    fecha de pago, ver ADR-010). El envío en sí lo hace
+    `_on_procesar_notificaciones`, que corre cada minuto y recoge lo que este
+    job deje en la cola."""
+    try:
+        encoladas = await _api_client(context).generar_recordatorios_mora()
+    except ApiError as exc:
+        logger.warning("No se pudo generar los recordatorios de mora: %s", exc.mensaje)
+        return
+    if encoladas:
+        logger.info("Recordatorios de cuota próxima encolados: %s", encoladas)
 
 
 def _texto_aviso_operador(resumen: ResumenProcesamiento) -> str:

@@ -8,12 +8,29 @@ from coop_core.services.amortization import (
 
 
 def test_calculate_mora_dentro_gracia() -> None:
-    assert calculate_mora("2024-01-01", date(2024, 1, 15), 100000, 0.02) == 0
+    """Vence el 1, todavía dentro de los 5 días de gracia (hasta el 6)."""
+    assert calculate_mora("2024-01-01", date(2024, 1, 4), 100000, 0.02) == 0
 
 
-def test_calculate_mora_fuera_gracia() -> None:
-    mora = calculate_mora("2024-01-01", date(2024, 3, 1), 100000, 0.02)
+def test_calculate_mora_justo_al_limite_de_gracia_no_cobra() -> None:
+    assert calculate_mora("2024-01-01", date(2024, 1, 5), 100000, 0.02) == 0
+
+
+def test_calculate_mora_fuera_gracia_cobra_un_mes() -> None:
+    mora = calculate_mora("2024-01-01", date(2024, 1, 10), 100000, 0.02)
     assert mora == 2000
+
+
+def test_calculate_mora_compone_por_meses_completos_de_atraso() -> None:
+    """Vence el 1 de enero: si se paga el 6 de julio van 7 meses de atraso."""
+    mora = calculate_mora("2024-01-01", date(2024, 7, 6), 100000, 0.02)
+    assert mora == 100000 * 0.02 * 7
+
+
+def test_calculate_mora_un_dia_antes_no_suma_el_mes_siguiente() -> None:
+    """Si se paga el 5 de julio (un día antes del 6) van solo 6 meses de atraso."""
+    mora = calculate_mora("2024-01-01", date(2024, 7, 5), 100000, 0.02)
+    assert mora == 100000 * 0.02 * 6
 
 
 def test_round_installments_divides_exactly() -> None:

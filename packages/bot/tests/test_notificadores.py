@@ -8,7 +8,7 @@ from coop_bot.notificaciones.notificadores import (
     WaMeLinkNotificador,
     construir_notificador,
 )
-from coop_contracts.notificador import ParamsPlantilla, ResultadoEnvio
+from coop_contracts.notificador import ParamsPlantilla, ParamsRecordatorio, ResultadoEnvio
 
 
 def _config(**overrides: object) -> Config:
@@ -132,7 +132,7 @@ def test_cloud_api_notificador_usa_plantilla_con_el_pdf_en_el_encabezado() -> No
         "texto largo que no se usa en plantilla",
         b"%PDF-1.4",
         "Recibo_7.pdf",
-        ParamsPlantilla(nombre="Pedro", detalle="Registramos tu aporte de $50.000"),
+        ParamsPlantilla(nombre="Pedro", documento="recibo"),
     )
 
     assert resultado.exitoso is True
@@ -146,10 +146,7 @@ def test_cloud_api_notificador_usa_plantilla_con_el_pdf_en_el_encabezado() -> No
         "id": "media-999",
         "filename": "Recibo_7.pdf",
     }
-    assert [p["text"] for p in cuerpo["parameters"]] == [
-        "Pedro",
-        "Registramos tu aporte de $50.000",
-    ]
+    assert [p["text"] for p in cuerpo["parameters"]] == ["Pedro", "recibo"]
 
 
 def test_cloud_api_notificador_sin_plantilla_configurada_manda_documento_libre() -> None:
@@ -167,17 +164,76 @@ def test_cloud_api_notificador_sin_plantilla_configurada_manda_documento_libre()
         "Tu recibo",
         b"%PDF",
         "a.pdf",
-        ParamsPlantilla(nombre="Pedro", detalle="algo"),
+        ParamsPlantilla(nombre="Pedro", documento="recibo"),
     )
 
     assert payloads[0]["type"] == "document"
 
 
+def _params_recordatorio() -> ParamsRecordatorio:
+    return ParamsRecordatorio(
+        nombre="Pedro",
+        numero_cuota="3",
+        numero_letra="12",
+        fecha_pago_cuota="13/08/2026",
+        fecha_mora="18/08/2026",
+        monto_mora="$2.000",
+    )
+
+
+def test_cloud_api_notificador_recordatorio_usa_plantilla_de_solo_cuerpo() -> None:
+    """El recordatorio no tiene documento adjunto: la plantilla solo trae
+    componente de cuerpo, sin encabezado (a diferencia de comprobante_operacion)."""
+    payloads: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payloads.append(json.loads(request.read()))
+        return httpx.Response(200, json={"messages": [{"id": "wamid.5"}]})
+
+    notificador = CloudApiNotificador(
+        token="t",
+        phone_number_id="1",
+        plantilla_recordatorio="recordatorio_mora_proxima",
+        plantilla_idioma="es",
+        transport=httpx.MockTransport(handler),
+    )
+    resultado = notificador.enviar_recordatorio(
+        "+573112223344", "texto libre que no se usa en plantilla", _params_recordatorio()
+    )
+
+    assert resultado.exitoso is True
+    payload = payloads[0]
+    assert payload["type"] == "template"
+    assert payload["template"]["name"] == "recordatorio_mora_proxima"
+    (cuerpo,) = payload["template"]["components"]
+    assert cuerpo["type"] == "body"
+    assert [p["text"] for p in cuerpo["parameters"]] == [
+        "Pedro",
+        "3",
+        "12",
+        "13/08/2026",
+        "18/08/2026",
+        "$2.000",
+    ]
+
+
+def test_cloud_api_notificador_recordatorio_sin_plantilla_manda_texto_libre() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.read())
+        assert payload["type"] == "text"
+        return httpx.Response(200, json={"messages": [{"id": "wamid.6"}]})
+
+    notificador = CloudApiNotificador(token="t", phone_number_id="1", transport=httpx.MockTransport(handler))
+    resultado = notificador.enviar_recordatorio("+573112223344", "hola", _params_recordatorio())
+
+    assert resultado.exitoso is True
+
+
 def test_params_plantilla_se_aplanan_a_una_linea() -> None:
     """Meta rechaza variables con saltos de línea o espacios repetidos."""
-    limpios = ParamsPlantilla(nombre="Pedro", detalle="linea uno\nlinea    dos\ttres").limpiar()
+    limpios = ParamsPlantilla(nombre="Pedro", documento="linea uno\nlinea    dos\ttres").limpiar()
 
-    assert limpios.detalle == "linea uno linea dos tres"
+    assert limpios.documento == "linea uno linea dos tres"
 
 
 # ── WaMeLinkNotificador ──────────────────────────────────────────────────────
@@ -232,6 +288,11 @@ class _NotificadorFijo:
     ) -> ResultadoEnvio:
         return self._resultado
 
+    def enviar_recordatorio(
+        self, numero_e164: str, texto: str, plantilla: ParamsRecordatorio | None = None
+    ) -> ResultadoEnvio:
+        return self._resultado
+
 
 def test_fallback_no_se_usa_si_el_primario_funciona() -> None:
     primario = _NotificadorFijo(ResultadoEnvio(exitoso=True, canal="cloud_api"))
@@ -262,6 +323,18 @@ def test_fallback_enviar_documento_usa_fallback_si_primario_falla() -> None:
     assert resultado.canal == "wa_me_link"
     assert resultado.wa_me_url is not None
     assert "Recibo_1.pdf" in resultado.wa_me_url
+
+
+def test_fallback_enviar_recordatorio_usa_fallback_si_primario_falla() -> None:
+    primario = _NotificadorFijo(ResultadoEnvio(exitoso=False, canal="cloud_api", error="rechazado"))
+    compuesto = NotificadorConFallback(primario, WaMeLinkNotificador())
+
+    resultado = compuesto.enviar_recordatorio(
+        "+573112223344", "Tu cuota está por vencer", _params_recordatorio()
+    )
+
+    assert resultado.exitoso is True
+    assert resultado.canal == "wa_me_link"
 
 
 # ── construir_notificador ─────────────────────────────────────────────────────

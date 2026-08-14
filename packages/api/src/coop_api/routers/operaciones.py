@@ -158,7 +158,7 @@ def registrar_aportes(
         saldo_caja_nuevo=resultado["nuevo_saldo_caja"],
     )
     recibos_wire.guardar_recibo_aporte(db, resultado, recibi_de)
-    notificaciones_wire.notificar_aportes(db, resultado)
+    notificaciones_wire.notificar_aportes(db, resultado, recibi_de)
     idem.store(db, idem_key, "POST /operaciones/aportes", payload_json, resp.model_dump())
     db.commit()
     return resp
@@ -318,7 +318,7 @@ def registrar_pagos(
         saldo_caja_nuevo=resultado["nuevo_saldo_caja"],
     )
     recibos_wire.guardar_recibo_pago(db, resultado, recibi_de)
-    notificaciones_wire.notificar_pagos(db, resultado)
+    notificaciones_wire.notificar_pagos(db, resultado, recibi_de)
     idem.store(db, idem_key, "POST /operaciones/pagos", payload_json, resp.model_dump())
     db.commit()
     return resp
@@ -417,7 +417,7 @@ def registrar_combinado(
         saldo_caja_nuevo=resultado["nuevo_saldo_caja"],
     )
     recibos_wire.guardar_recibo_combinado(db, resultado, recibi_de, n_cobrables)
-    notificaciones_wire.notificar_combinado(db, resultado)
+    notificaciones_wire.notificar_combinado(db, resultado, recibi_de)
     idem.store(db, idem_key, "POST /operaciones/combinados", payload_json, resp.model_dump())
     db.commit()
     return resp

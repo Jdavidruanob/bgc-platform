@@ -11,6 +11,7 @@ dependencies = [
     "psycopg[binary]>=3.1",
     "rapidfuzz>=3.9",
     "openpyxl>=3.1",
+    "httpx>=0.28",
 ]
 
 [tool.uv.sources]
@@ -23,7 +24,6 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
 ]

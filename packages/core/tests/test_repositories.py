@@ -81,6 +81,35 @@ def test_socios_update(repos: dict[str, Any]) -> None:
     assert row["saldo"] == 5000
 
 
+def test_socios_find_by_whatsapp_e164_match_explicito(repos: dict[str, Any]) -> None:
+    repos["socios"].save("Rosa", "Torres", None, None, whatsapp_e164="+573001112233")
+    repos["conn"].commit()
+    row = repos["socios"].find_by_whatsapp_e164("573001112233")
+    assert row is not None
+    assert row["nombres"] == "Rosa"
+
+
+def test_socios_find_by_whatsapp_e164_derivado_de_celular(repos: dict[str, Any]) -> None:
+    repos["socios"].save("Pedro", "Gomez", "3009998877", None)
+    repos["conn"].commit()
+    row = repos["socios"].find_by_whatsapp_e164("+573009998877")
+    assert row is not None
+    assert row["nombres"] == "Pedro"
+
+
+def test_socios_find_by_whatsapp_e164_sin_match(repos: dict[str, Any]) -> None:
+    repos["socios"].save("Ana", "Ruiz", "3001112233", None)
+    repos["conn"].commit()
+    assert repos["socios"].find_by_whatsapp_e164("573009999999") is None
+
+
+def test_socios_find_by_whatsapp_e164_ambiguo_no_elige(repos: dict[str, Any]) -> None:
+    repos["socios"].save("Carla", "Uno", None, None, whatsapp_e164="+573001112233")
+    repos["socios"].save("Diego", "Dos", None, None, whatsapp_e164="+573001112233")
+    repos["conn"].commit()
+    assert repos["socios"].find_by_whatsapp_e164("573001112233") is None
+
+
 # ─── CreditosRepository ───────────────────────────────────────────────────────
 
 

@@ -20,6 +20,7 @@ import httpx
 from coop_contracts.notificador import (
     Notificador,
     ParamsPlantilla,
+    ParamsRecordatorio,
     ResultadoEnvio,
 )
 
@@ -48,12 +49,14 @@ class CloudApiNotificador:
         *,
         plantilla: str | None = None,
         plantilla_idioma: str = "es",
+        plantilla_recordatorio: str | None = None,
         timeout: float = 10.0,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         self._phone_number_id = phone_number_id
         self._plantilla = plantilla
         self._plantilla_idioma = plantilla_idioma
+        self._plantilla_recordatorio = plantilla_recordatorio
         self._client = httpx.Client(
             base_url=self._BASE_URL,
             timeout=timeout,
@@ -129,6 +132,53 @@ class CloudApiNotificador:
             return ResultadoEnvio(exitoso=False, canal="cloud_api", error=_extraer_error_meta(respuesta))
         return ResultadoEnvio(exitoso=True, canal="cloud_api")
 
+    def enviar_recordatorio(
+        self, numero_e164: str, texto: str, plantilla: ParamsRecordatorio | None = None
+    ) -> ResultadoEnvio:
+        """Recordatorio de mora próxima (cuota que vence hoy): sin documento
+        adjunto, así que la plantilla (si hay una configurada) solo tiene
+        componente de cuerpo, sin encabezado. Sin plantilla configurada
+        intenta texto libre, que Meta rechazará fuera de la ventana de 24h —
+        el procesador de la cola cae entonces al fallback wa.me.
+        """
+        destino = numero_e164.removeprefix("+")
+        if self._plantilla_recordatorio and plantilla is not None:
+            payload = self._payload_plantilla_recordatorio(destino, plantilla.limpiar())
+            try:
+                respuesta = self._client.post(
+                    f"/{self._VERSION}/{self._phone_number_id}/messages", json=payload
+                )
+            except httpx.HTTPError as exc:
+                return ResultadoEnvio(exitoso=False, canal="cloud_api", error=str(exc))
+            if respuesta.is_error:
+                return ResultadoEnvio(exitoso=False, canal="cloud_api", error=_extraer_error_meta(respuesta))
+            return ResultadoEnvio(exitoso=True, canal="cloud_api")
+        return self.enviar(numero_e164, texto)
+
+    def _payload_plantilla_recordatorio(self, destino: str, params: ParamsRecordatorio) -> dict[str, Any]:
+        return {
+            "messaging_product": "whatsapp",
+            "to": destino,
+            "type": "template",
+            "template": {
+                "name": self._plantilla_recordatorio,
+                "language": {"code": self._plantilla_idioma},
+                "components": [
+                    {
+                        "type": "body",
+                        "parameters": [
+                            {"type": "text", "text": params.nombre},
+                            {"type": "text", "text": params.numero_cuota},
+                            {"type": "text", "text": params.numero_letra},
+                            {"type": "text", "text": params.fecha_pago_cuota},
+                            {"type": "text", "text": params.fecha_mora},
+                            {"type": "text", "text": params.monto_mora},
+                        ],
+                    },
+                ],
+            },
+        }
+
     def _payload_plantilla(
         self, destino: str, media_id: str, nombre_archivo: str, params: ParamsPlantilla
     ) -> dict[str, Any]:
@@ -153,7 +203,7 @@ class CloudApiNotificador:
                         "type": "body",
                         "parameters": [
                             {"type": "text", "text": params.nombre},
-                            {"type": "text", "text": params.detalle},
+                            {"type": "text", "text": params.documento},
                         ],
                     },
                 ],
@@ -192,6 +242,11 @@ class WaMeLinkNotificador:
         aviso = f"{texto}\n\n(Documento: {nombre_archivo} — pídemelo en el bot si lo necesitas)"
         return self.enviar(numero_e164, aviso)
 
+    def enviar_recordatorio(
+        self, numero_e164: str, texto: str, plantilla: ParamsRecordatorio | None = None
+    ) -> ResultadoEnvio:
+        return self.enviar(numero_e164, texto)
+
 
 class NotificadorConFallback:
     """Intenta con el notificador primario; si falla, recurre al fallback.
@@ -223,6 +278,14 @@ class NotificadorConFallback:
             return resultado
         return self._fallback.enviar_documento(numero_e164, texto, contenido, nombre_archivo, plantilla)
 
+    def enviar_recordatorio(
+        self, numero_e164: str, texto: str, plantilla: ParamsRecordatorio | None = None
+    ) -> ResultadoEnvio:
+        resultado = self._primario.enviar_recordatorio(numero_e164, texto, plantilla)
+        if resultado.exitoso:
+            return resultado
+        return self._fallback.enviar_recordatorio(numero_e164, texto, plantilla)
+
 
 def construir_notificador(config: Config) -> Notificador:
     """Cloud API + fallback wa.me si hay credenciales de Meta; solo wa.me si no."""
@@ -233,11 +296,14 @@ def construir_notificador(config: Config) -> Notificador:
             phone_number_id=config.whatsapp_phone_number_id,
             plantilla=config.whatsapp_plantilla,
             plantilla_idioma=config.whatsapp_plantilla_idioma,
+            plantilla_recordatorio=config.whatsapp_plantilla_recordatorio,
         )
         logger.info(
-            "Notificador WhatsApp: Cloud API + fallback wa.me (phone_number_id=%s, plantilla=%s)",
+            "Notificador WhatsApp: Cloud API + fallback wa.me "
+            "(phone_number_id=%s, plantilla=%s, plantilla_recordatorio=%s)",
             config.whatsapp_phone_number_id,
             config.whatsapp_plantilla or "(ninguna, texto libre)",
+            config.whatsapp_plantilla_recordatorio or "(ninguna, texto libre)",
         )
         return NotificadorConFallback(primario, fallback)
     logger.warning(

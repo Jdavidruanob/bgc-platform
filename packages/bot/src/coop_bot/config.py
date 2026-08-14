@@ -33,6 +33,9 @@ class Config:
     # a socios que hayan escrito en las últimas 24h (ver ADR-010).
     whatsapp_plantilla: str | None = None
     whatsapp_plantilla_idioma: str = "es"
+    # Plantilla del recordatorio de cuota próxima a vencer (sin documento
+    # adjunto, así que es una plantilla distinta a `whatsapp_plantilla`).
+    whatsapp_plantilla_recordatorio: str | None = None
 
     @property
     def telegram_operador_chat_id(self) -> int:
@@ -58,6 +61,7 @@ class Config:
             whatsapp_phone_number_id=os.environ.get("WHATSAPP_PHONE_NUMBER_ID") or None,
             whatsapp_plantilla=os.environ.get("WHATSAPP_PLANTILLA") or None,
             whatsapp_plantilla_idioma=os.environ.get("WHATSAPP_PLANTILLA_IDIOMA") or "es",
+            whatsapp_plantilla_recordatorio=os.environ.get("WHATSAPP_PLANTILLA_RECORDATORIO") or None,
         )
 
     @staticmethod

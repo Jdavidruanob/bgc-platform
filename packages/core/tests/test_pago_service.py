@@ -124,12 +124,12 @@ def test_pago_abono_incompleto_segunda_cuota(repos: dict[str, Any]) -> None:
 
 def test_pago_abono_cascada_exitoso(repos: dict[str, Any]) -> None:
     """Abono cubre cuota vencida + remanente va como abono capital."""
-    fecha_mod.set_fecha_simulada(date(2024, 2, 15))  # solo cuota 1 (2024-02-01) vencida
+    fecha_mod.set_fecha_simulada(date(2024, 2, 4))  # cuota 1 (2024-02-01) vencida, aún en gracia
     sid = _insert_socio(repos, "G", "H")
     letra = _setup_credito(repos, sid, 600_000, 6)
     pending = repos["liquidaciones"].find_pending(letra)
     cuota1 = pending[0]
-    # Mora=0 porque hoy(2024-02-15) < f_limite(2024-03-01)
+    # Mora=0 porque hoy(2024-02-04) < f_limite(2024-02-06): 5 días de gracia
     costo_cuota1 = int(cuota1["valor_cuota"]) + int(cuota1["interes_mes"])
     abono = costo_cuota1 + 10_000  # 10_000 extra va como abono capital
 

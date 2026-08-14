@@ -1,6 +1,7 @@
 from typing import Any
 
 from coop_core.db.connection import DbConnection
+from coop_core.utils.telefono import derivar_whatsapp_e164
 
 
 class SociosRepository:
@@ -55,6 +56,23 @@ class SociosRepository:
         """)
         cols = [d[0] for d in cursor.description]
         return [dict(zip(cols, row, strict=False)) for row in cursor.fetchall()]
+
+    def find_by_whatsapp_e164(self, numero: str) -> dict[str, Any] | None:
+        """Busca al socio activo cuyo WhatsApp (explícito o derivado del
+        celular vía `derivar_whatsapp_e164`) coincide con `numero`. Compara en
+        memoria porque la columna no tiene índice ni es UNIQUE — son ~54
+        socios, es barato. Si hay más de un socio con el mismo número, no
+        elige: devuelve None para no arriesgarse a mostrarle a alguien la
+        información de otro socio."""
+        objetivo = numero if numero.startswith("+") else f"+{numero}"
+        coincidencias = [
+            s
+            for s in self.find_all_full()
+            if derivar_whatsapp_e164(s.get("whatsapp_e164"), s.get("celular")) == objetivo
+        ]
+        if len(coincidencias) != 1:
+            return None
+        return coincidencias[0]
 
     def find_by_id(self, member_id: int) -> dict[str, Any] | None:
         cursor = self._conn.cursor()

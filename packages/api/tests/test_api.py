@@ -361,7 +361,7 @@ def test_pago_cuotas_insuficientes(client: TestClient, socio_pedro, credito_pedr
 # ── POST /operaciones/combinados ──────────────────────────────────────────────
 
 
-def test_combinado(client: TestClient, socio_pedro, socio_maria, credito_pedro):
+def test_combinado(client: TestClient, socio_pedro, socio_maria, credito_pedro, db_conn):
     r = client.post(
         "/operaciones/combinados",
         json={
@@ -382,6 +382,12 @@ def test_combinado(client: TestClient, socio_pedro, socio_maria, credito_pedro):
     data = r.json()
     assert len(data["aportes"]) == 1
     assert len(data["pagos"]) == 1
+
+    # María aportó dentro del mismo recibo, pero solo Pedro (recibi_de) debe
+    # recibir el WhatsApp — un único borrador, no uno por cada socio del recibo.
+    n = _notifs(db_conn)
+    assert len(n) == 1
+    assert n[0]["socio_id"] == socio_pedro
 
 
 # ── Listado y liquidación actual ──────────────────────────────────────────────
@@ -639,7 +645,7 @@ def test_aporte_crea_borrador_de_recibo(client: TestClient, socio_pedro, db_conn
     assert n["estado"] == "borrador"
     assert n["documento_tipo"] == "recibo" and n["documento_id"] == recibo_id
     assert n["numero_e164"] == "+573001234567"
-    assert "80.000" in n["texto"]
+    assert "recibo" in n["texto"].lower()
 
 
 def test_retiro_crea_borrador(client: TestClient, socio_pedro, db_conn):
@@ -647,7 +653,7 @@ def test_retiro_crea_borrador(client: TestClient, socio_pedro, db_conn):
     assert r.status_code == 201
     n = _notifs(db_conn)
     assert len(n) == 1 and n[0]["estado"] == "borrador"
-    assert "retiro" in n[0]["texto"].lower() and "50.000" in n[0]["texto"]
+    assert "recibo" in n[0]["texto"].lower()
 
 
 def test_pago_crea_borrador(client: TestClient, socio_pedro, credito_pedro, db_conn):
@@ -664,7 +670,7 @@ def test_pago_crea_borrador(client: TestClient, socio_pedro, credito_pedro, db_c
     assert r.status_code == 201
     n = _notifs(db_conn)
     assert len(n) == 1 and n[0]["estado"] == "borrador"
-    assert str(credito_pedro) in n[0]["texto"]
+    assert "recibo" in n[0]["texto"].lower()
 
 
 def test_socio_sin_telefono_no_crea_borrador(client: TestClient, db_conn):
@@ -696,7 +702,7 @@ def test_crear_credito_crea_borrador_de_liquidacion(client: TestClient, socio_pe
     n = _notifs(db_conn)[0]
     assert n["estado"] == "borrador"
     assert n["documento_tipo"] == "liquidacion" and n["documento_id"] == letra_id
-    assert "aprobado" in n["texto"].lower()
+    assert "liquidación" in n["texto"].lower()
 
 
 def test_borrador_saluda_por_nombre(client: TestClient, socio_pedro, db_conn):
@@ -722,7 +728,7 @@ def test_borrador_detalle_en_una_sola_linea(client: TestClient, socio_pedro, db_
     assert r.status_code == 201
     n = _notifs(db_conn)[0]
     detalle = n["detalle"]
-    assert detalle.startswith("Registramos tu aporte de $50.000 y tu nuevo saldo es $")
+    assert detalle == "recibo"
     assert "\n" not in detalle and "\t" not in detalle
     assert detalle in n["texto"]
 

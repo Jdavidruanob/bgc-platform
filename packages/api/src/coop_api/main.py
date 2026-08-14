@@ -16,7 +16,9 @@ from coop_api.routers import (
     notificaciones,
     operaciones,
     recibos_archivos,
+    recordatorios,
     socios,
+    webhook_whatsapp,
 )
 
 
@@ -52,12 +54,15 @@ app.include_router(caja.router)
 app.include_router(creditos.router)
 app.include_router(operaciones.router)
 app.include_router(notificaciones.router)
+app.include_router(recordatorios.router)
 app.include_router(recibos_archivos.router)
 app.include_router(config.router)
+app.include_router(webhook_whatsapp.router)
 
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logging.getLogger(__name__).exception("Excepción no manejada en %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=500,
         content={
