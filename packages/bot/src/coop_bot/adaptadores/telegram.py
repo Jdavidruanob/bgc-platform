@@ -9,6 +9,7 @@ Descarga audio, llama a Whisper/NLU, y delega toda la lógica de negocio a
 from __future__ import annotations
 
 import io
+import json
 import logging
 from datetime import time, timedelta, timezone
 from typing import cast
@@ -153,15 +154,49 @@ async def _on_generar_recordatorios_mora(context: ContextTypes.DEFAULT_TYPE) -> 
         logger.info("Recordatorios de cuota próxima encolados: %s", encoladas)
 
 
+def _texto_recordatorio_cuota(nombre: str, detalle: str | None) -> str:
+    """Redacta, en primera persona (como asistente personal), lo que se le
+    avisó al socio. Si el detalle no trae los datos de la cuota (no debería
+    pasar, ver `recordatorios_wire.py`), cae a una frase genérica en vez de
+    reventar el aviso completo."""
+    datos: dict[str, str] = {}
+    if detalle:
+        try:
+            datos = json.loads(detalle)
+        except ValueError:
+            datos = {}
+    numero_cuota = datos.get("numero_cuota")
+    numero_letra = datos.get("numero_letra")
+    fecha_mora = datos.get("fecha_mora")
+    if numero_cuota and numero_letra and fecha_mora:
+        return (
+            f"• Te informo que le avisé a {nombre} que la cuota #{numero_cuota} "
+            f"del crédito #{numero_letra} vence pronto y entra en mora el {fecha_mora}."
+        )
+    return f"• Te informo que le avisé a {nombre} que se le vence una cuota pronto."
+
+
 def _texto_aviso_operador(resumen: ResumenProcesamiento) -> str:
-    """Le cuenta al operador qué pasó con los comprobantes que salieron para
-    los socios. Vacío si no hubo nada que reportar."""
+    """Le cuenta al operador qué se le mandó a cada socio. Distingue
+    'comprobante' (recibo/liquidación) de 'recordatorio de cuota' — llamar
+    comprobante a un recordatorio confundía al operador, que pensaba que era
+    un pago cuando en realidad es un aviso de que una cuota está por vencer.
+    Vacío si no hubo nada que reportar."""
     lineas: list[str] = []
 
-    entregados = [e.socio_nombre for e in resumen.envios if e.entregado]
-    if entregados:
+    entregados = [e for e in resumen.envios if e.entregado]
+    recordatorios = [e for e in entregados if e.documento_tipo == "recordatorio_cuota"]
+    comprobantes = [e for e in entregados if e.documento_tipo != "recordatorio_cuota"]
+
+    if comprobantes:
         lineas.append("✅ Ya recibieron su comprobante por WhatsApp:")
-        lineas += [f"• {nombre}" for nombre in entregados]
+        lineas += [f"• {e.socio_nombre}" for e in comprobantes]
+
+    if recordatorios:
+        if lineas:
+            lineas.append("")
+        lineas.append("🔔 Recordatorios de cuota próxima a vencer:")
+        lineas += [_texto_recordatorio_cuota(e.socio_nombre, e.detalle) for e in recordatorios]
 
     # El fallback wa.me no envía nada por sí solo: genera un link que alguien
     # tiene que abrir. Se reporta aparte para no dar por entregado lo que no lo está.

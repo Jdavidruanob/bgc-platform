@@ -94,6 +94,48 @@ def test_aviso_operador_vacio_si_no_hubo_nada() -> None:
     assert _texto_aviso_operador(ResumenProcesamiento()) == ""
 
 
+def test_aviso_operador_distingue_recordatorio_de_comprobante() -> None:
+    """Un recordatorio de cuota no es un comprobante: llamarlo así confunde
+    al operador (pensaría que fue un pago, ver feedback del usuario)."""
+    resumen = ResumenProcesamiento(
+        envios=[
+            EnvioRealizado(
+                socio_nombre="Pedro Gómez",
+                canal="cloud_api",
+                documento_tipo="recordatorio_cuota",
+                detalle=json.dumps({"numero_cuota": "3", "numero_letra": "12", "fecha_mora": "18/08/2026"}),
+            )
+        ]
+    )
+
+    aviso = _texto_aviso_operador(resumen)
+
+    assert "Ya recibieron su comprobante" not in aviso
+    assert "Te informo que le avisé a Pedro Gómez" in aviso
+    assert "cuota #3" in aviso
+    assert "crédito #12" in aviso
+    assert "18/08/2026" in aviso
+
+
+def test_aviso_operador_separa_recordatorios_de_comprobantes_en_el_mismo_lote() -> None:
+    resumen = ResumenProcesamiento(
+        envios=[
+            EnvioRealizado(socio_nombre="María López", canal="cloud_api"),
+            EnvioRealizado(
+                socio_nombre="Pedro Gómez",
+                canal="cloud_api",
+                documento_tipo="recordatorio_cuota",
+                detalle=json.dumps({"numero_cuota": "3", "numero_letra": "12", "fecha_mora": "18/08/2026"}),
+            ),
+        ]
+    )
+
+    aviso = _texto_aviso_operador(resumen)
+
+    assert "Ya recibieron su comprobante por WhatsApp:\n• María López" in aviso
+    assert "Te informo que le avisé a Pedro Gómez" in aviso
+
+
 async def test_sin_pendientes_no_hace_nada(api_client: ApiClient) -> None:
     await procesar_pendientes(api_client, MockNotificador())  # consume la única semilla
 

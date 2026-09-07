@@ -26,11 +26,19 @@ logger = logging.getLogger(__name__)
 class EnvioRealizado:
     """Un envío que salió bien. `canal` distingue el envío real por WhatsApp
     ('cloud_api') del fallback que solo genera un link ('wa_me_link'): en ese
-    segundo caso el socio TODAVÍA no recibió nada, hay que abrir el link."""
+    segundo caso el socio TODAVÍA no recibió nada, hay que abrir el link.
+
+    `documento_tipo` y `detalle` viajan desde la notificación original para
+    que el aviso al operador (ver `_texto_aviso_operador` en `telegram.py`)
+    pueda redactar un mensaje distinto según de qué se trata — un recordatorio
+    de cuota no es un "comprobante", y confundirlos genera confusión real al
+    operador (ver feedback del usuario)."""
 
     socio_nombre: str
     canal: str
     wa_me_url: str | None = None
+    documento_tipo: str | None = None
+    detalle: str | None = None
 
     @property
     def entregado(self) -> bool:
@@ -103,6 +111,8 @@ async def _procesar_una(
                 socio_nombre=notificacion.socio_nombre,
                 canal=resultado.canal,
                 wa_me_url=resultado.wa_me_url,
+                documento_tipo=notificacion.documento_tipo,
+                detalle=notificacion.detalle,
             )
         )
         await _marcar(cliente, notificacion.id, "enviada", None, resumen)
