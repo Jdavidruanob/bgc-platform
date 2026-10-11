@@ -412,6 +412,38 @@ def test_statuses_se_ignoran(client: TestClient, cliente_wa: Any) -> None:
     assert cliente_wa.textos == [] and cliente_wa.botones == []
 
 
+def test_status_failed_se_registra_como_warning_con_el_codigo_de_meta(
+    client: TestClient, cliente_wa: Any, caplog: pytest.LogCaptureFixture
+) -> None:
+    status = {
+        "id": "wamid.fallido",
+        "status": "failed",
+        "recipient_id": "573001234567",
+        "errors": [{"code": 131049, "title": "Message undeliverable"}],
+    }
+    with caplog.at_level("INFO", logger="coop_api.routers.webhook_whatsapp"):
+        r = _post(client, _sobre(statuses=[status]))
+
+    assert r.status_code == 200
+    avisos = [x for x in caplog.records if x.levelname == "WARNING"]
+    assert len(avisos) == 1
+    mensaje = avisos[0].getMessage()
+    assert "wamid.fallido" in mensaje and "131049" in mensaje
+    assert "573001234567" not in mensaje  # el número se enmascara
+
+
+def test_status_delivered_se_registra_como_info(
+    client: TestClient, cliente_wa: Any, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level("INFO", logger="coop_api.routers.webhook_whatsapp"):
+        _post(
+            client,
+            _sobre(statuses=[{"id": "wamid.ok", "status": "delivered", "recipient_id": "573001234567"}]),
+        )
+
+    assert [x.levelname for x in caplog.records if "wamid.ok" in x.getMessage()] == ["INFO"]
+
+
 def test_nota_de_voz(client: TestClient, db_conn: Any, cliente_wa: Any) -> None:
     _crear_socio(db_conn, "Pedro Antonio", "Gómez Ruiz", "3001234567", NUM_PEDRO_E164)
     r = _post(client, _sobre([_msg_audio(NUM_PEDRO_META)]))

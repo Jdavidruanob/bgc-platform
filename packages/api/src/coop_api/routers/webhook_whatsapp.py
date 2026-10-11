@@ -25,7 +25,7 @@ from fastapi import APIRouter, BackgroundTasks, Query, Request, Response
 from coop_api.asistente import flujo
 from coop_api.asistente.config import ConfigAsistente, desde_entorno
 from coop_api.asistente.copy import numero_no_reconocido
-from coop_api.asistente.entrada import parsear_mensajes
+from coop_api.asistente.entrada import parsear_estados, parsear_mensajes
 from coop_api.asistente.whatsapp_cliente import ClienteWaDep, ClienteWhatsApp
 from coop_api.deps import DbDep
 
@@ -87,6 +87,7 @@ def _procesar(
     cfg: ConfigAsistente,
     payload: Any,
 ) -> None:
+    _registrar_estados(payload)
     socios_repo = SociosRepository(db)
     for mensaje in parsear_mensajes(payload):
         numero_e164 = mensaje.numero if mensaje.numero.startswith("+") else f"+{mensaje.numero}"
@@ -99,6 +100,24 @@ def _procesar(
             continue
 
         flujo.atender(db, cliente, background, numero_e164, socio, mensaje)
+
+
+def _registrar_estados(payload: Any) -> None:
+    """Deja en el log lo que Meta dice de los mensajes que enviamos. Un
+    'failed' va a WARNING: es el caso en que Meta aceptó el envío pero no lo
+    entregó (ej. 131049, 131026), y no hay otro rastro de eso."""
+    for st in parsear_estados(payload):
+        if st.estado == "failed":
+            logger.warning(
+                "WhatsApp NO entregado wamid=%s destino=***%s errores=%s",
+                st.mensaje_id,
+                st.destinatario[-4:],
+                "; ".join(st.errores) or "(sin detalle)",
+            )
+        else:
+            logger.info(
+                "WhatsApp estado=%s wamid=%s destino=***%s", st.estado, st.mensaje_id, st.destinatario[-4:]
+            )
 
 
 def _firma_valida(cuerpo: bytes, firma_header: str | None, app_secret: str) -> bool:

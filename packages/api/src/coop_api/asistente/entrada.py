@@ -24,8 +24,8 @@ class MensajeEntrante:
 
 
 def parsear_mensajes(payload: Any) -> list[MensajeEntrante]:
-    """Extrae los mensajes entrantes de un sobre de webhook. Ignora en
-    silencio `statuses` (confirmaciones de entrega/lectura) y cualquier
+    """Extrae los mensajes entrantes de un sobre de webhook. Ignora
+    `statuses` (ver `parsear_estados`) y cualquier
     estructura que no sea la esperada."""
     mensajes: list[MensajeEntrante] = []
     if not isinstance(payload, dict):
@@ -45,6 +45,53 @@ def parsear_mensajes(payload: Any) -> list[MensajeEntrante]:
                 if mensaje is not None:
                     mensajes.append(mensaje)
     return mensajes
+
+
+@dataclass(frozen=True)
+class EstadoMensaje:
+    """Confirmación de Meta sobre un mensaje que NOSOTROS enviamos."""
+
+    mensaje_id: str
+    estado: str
+    """'sent' | 'delivered' | 'read' | 'failed'."""
+    destinatario: str = ""
+    errores: tuple[str, ...] = ()
+    """Cada uno como 'codigo: titulo'. Solo viene con 'failed'."""
+
+
+def parsear_estados(payload: Any) -> list[EstadoMensaje]:
+    """Extrae los `statuses` de un sobre de webhook. Es la única forma de
+    saber si un mensaje aceptado por Meta (HTTP 200 al enviarlo) realmente se
+    entregó. Igual que `parsear_mensajes`, nunca lanza ante un sobre raro."""
+    estados: list[EstadoMensaje] = []
+    if not isinstance(payload, dict):
+        return estados
+    for entry in _lista(payload.get("entry")):
+        if not isinstance(entry, dict):
+            continue
+        for change in _lista(entry.get("changes")):
+            if not isinstance(change, dict) or change.get("field") != "messages":
+                continue
+            value = change.get("value")
+            if not isinstance(value, dict):
+                continue
+            for st in _lista(value.get("statuses")):
+                if not isinstance(st, dict) or not st.get("id") or not st.get("status"):
+                    continue
+                errores = tuple(
+                    f"{e.get('code')}: {e.get('title') or e.get('message') or ''}"
+                    for e in _lista(st.get("errors"))
+                    if isinstance(e, dict)
+                )
+                estados.append(
+                    EstadoMensaje(
+                        mensaje_id=str(st["id"]),
+                        estado=str(st["status"]),
+                        destinatario=str(st.get("recipient_id") or ""),
+                        errores=errores,
+                    )
+                )
+    return estados
 
 
 def _lista(valor: Any) -> list[Any]:
