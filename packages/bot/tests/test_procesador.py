@@ -54,7 +54,7 @@ async def test_resumen_registra_los_fallos_con_nombre(api_client: ApiClient) -> 
 
 
 def test_aviso_operador_lista_los_entregados() -> None:
-    resumen = ResumenProcesamiento(envios=[EnvioRealizado(socio_nombre="Pedro Gómez", canal="cloud_api")])
+    resumen = ResumenProcesamiento(envios=[EnvioRealizado(socio_nombre="Pedro Gómez", canal="mock")])
 
     aviso = _texto_aviso_operador(resumen)
 
@@ -101,7 +101,7 @@ def test_aviso_operador_distingue_recordatorio_de_comprobante() -> None:
         envios=[
             EnvioRealizado(
                 socio_nombre="Pedro Gómez",
-                canal="cloud_api",
+                canal="mock",
                 documento_tipo="recordatorio_cuota",
                 detalle=json.dumps({"numero_cuota": "3", "numero_letra": "12", "fecha_mora": "18/08/2026"}),
             )
@@ -120,10 +120,10 @@ def test_aviso_operador_distingue_recordatorio_de_comprobante() -> None:
 def test_aviso_operador_separa_recordatorios_de_comprobantes_en_el_mismo_lote() -> None:
     resumen = ResumenProcesamiento(
         envios=[
-            EnvioRealizado(socio_nombre="María López", canal="cloud_api"),
+            EnvioRealizado(socio_nombre="María López", canal="mock"),
             EnvioRealizado(
                 socio_nombre="Pedro Gómez",
-                canal="cloud_api",
+                canal="mock",
                 documento_tipo="recordatorio_cuota",
                 detalle=json.dumps({"numero_cuota": "3", "numero_letra": "12", "fecha_mora": "18/08/2026"}),
             ),
@@ -178,9 +178,13 @@ class _ClienteSinDescargas:
 
     def __init__(self) -> None:
         self.patches: list[tuple[int, str, str | None]] = []
+        self.wamids: list[str | None] = []
 
-    async def patch_notificacion(self, notificacion_id: int, estado: str, error: str | None = None) -> None:
+    async def patch_notificacion(
+        self, notificacion_id: int, estado: str, error: str | None = None, wamid: str | None = None
+    ) -> None:
         self.patches.append((notificacion_id, estado, error))
+        self.wamids.append(wamid)
 
 
 def _notificacion_recordatorio() -> NotificacionPendiente:
@@ -227,3 +231,38 @@ async def test_recordatorio_de_cuota_usa_enviar_recordatorio_con_los_params() ->
     }
     # No debe pasar por el camino de documento: ni recibo ni liquidación.
     assert notificador.documentos_enviados == []
+
+
+# ── Cloud API: aceptado por Meta no es entregado ────────────────────────────
+
+
+class _NotificadorCloudApi:
+    """Como el real: Meta acepta (exitoso) y devuelve el wamid."""
+
+    def enviar(self, numero_e164: str, texto: str) -> ResultadoEnvio:
+        return ResultadoEnvio(exitoso=True, canal="cloud_api", mensaje_id="wamid.ABC")
+
+    def enviar_recordatorio(self, numero_e164: str, texto: str, plantilla: object = None) -> ResultadoEnvio:
+        return ResultadoEnvio(exitoso=True, canal="cloud_api", mensaje_id="wamid.ABC")
+
+
+async def test_guarda_el_wamid_al_marcar_enviada() -> None:
+    cliente = _ClienteSinDescargas()
+
+    await _procesar_una(cliente, _NotificadorCloudApi(), _notificacion_recordatorio(), ResumenProcesamiento())
+
+    assert cliente.patches == [(42, "enviada", None)]
+    assert cliente.wamids == ["wamid.ABC"]
+
+
+def test_aceptado_por_cloud_api_no_se_anuncia_como_entregado() -> None:
+    """Lo único que se anuncia es lo que Meta confirme después por webhook."""
+    resumen = ResumenProcesamiento(
+        envios=[
+            EnvioRealizado(socio_nombre="Pedro Gómez", canal="cloud_api", documento_tipo="recordatorio_cuota")
+        ]
+    )
+
+    assert _texto_aviso_operador(resumen) == ""
+    assert resumen.envios[0].esperando_confirmacion is True
+    assert resumen.envios[0].entregado is False

@@ -37,6 +37,9 @@ from coop_contracts.respuestas import (
     DevolucionTotalRequest,
     DevolucionTotalResponse,
     DocumentoNotificacionRequest,
+    EntregaPorAvisar,
+    EntregasAvisadasRequest,
+    EntregasPorAvisarResponse,
     ErrorDetail,
     ErrorResponse,
     FamiliaResponse,
@@ -806,6 +809,35 @@ def get_notificaciones_pendientes(_auth: AuthDep = None) -> NotificacionesPendie
     return NotificacionesPendientesResponse(notificaciones=pendientes)
 
 
+@app.get("/notificaciones/entregas-por-avisar")
+def get_entregas_por_avisar(_auth: AuthDep = None) -> EntregasPorAvisarResponse:
+    """Notificaciones con resultado real de entrega aún no avisado. En el mock
+    no hay webhook: los tests dejan `entrega_estado` directo en el estado."""
+    return EntregasPorAvisarResponse(
+        entregas=[
+            EntregaPorAvisar(
+                id=n["id"],
+                socio_nombre=n["socio_nombre"],
+                resultado=n["entrega_estado"],
+                documento_tipo=n.get("documento_tipo"),
+                detalle=n.get("detalle"),
+                error=n.get("entrega_error"),
+            )
+            for n in _state["notificaciones"]
+            if n.get("entrega_estado") in ("delivered", "failed", "sin_confirmacion")
+            and not n.get("entrega_avisada")
+        ]
+    )
+
+
+@app.post("/notificaciones/entregas-avisadas", status_code=200)
+def post_entregas_avisadas(body: EntregasAvisadasRequest, _auth: AuthDep = None) -> dict:
+    for n in _state["notificaciones"]:
+        if n["id"] in body.ids:
+            n["entrega_avisada"] = True
+    return {"avisadas": len(body.ids)}
+
+
 @app.patch("/notificaciones/{notif_id}", status_code=200)
 def patch_notificacion(
     notif_id: int,
@@ -817,6 +849,8 @@ def patch_notificacion(
             n["estado"] = body.estado
             if body.error:
                 n["error"] = body.error
+            if body.wamid:
+                n["wamid"] = body.wamid
             return {"id": notif_id, "estado": body.estado}
     raise HTTPException(status_code=404, detail=f"Notificación {notif_id} no encontrada")
 

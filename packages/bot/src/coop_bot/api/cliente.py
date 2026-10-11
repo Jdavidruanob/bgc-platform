@@ -22,6 +22,8 @@ from coop_contracts.respuestas import (
     DevolucionTotalRequest,
     DevolucionTotalResponse,
     DocumentoNotificacionRequest,
+    EntregasAvisadasRequest,
+    EntregasPorAvisarResponse,
     FamiliaResponse,
     NotificacionesPendientesResponse,
     PagosRequest,
@@ -134,8 +136,23 @@ class ApiClient:
     async def get_notificaciones_pendientes(self) -> NotificacionesPendientesResponse:
         return await self._get("/notificaciones/pendientes", {}, NotificacionesPendientesResponse)
 
-    async def patch_notificacion(self, notificacion_id: int, estado: str, error: str | None = None) -> None:
-        body = PatchNotificacionRequest(estado=estado, error=error)
+    async def get_entregas_por_avisar(self) -> EntregasPorAvisarResponse:
+        """Resultado real en WhatsApp (entregado / fallido / sin confirmación)
+        de mensajes que Meta aceptó y de los que aún no se avisó al operador."""
+        return await self._get("/notificaciones/entregas-por-avisar", {}, EntregasPorAvisarResponse)
+
+    async def marcar_entregas_avisadas(self, ids: list[int]) -> None:
+        body = EntregasAvisadasRequest(ids=ids)
+        response = await self._pedir(
+            lambda: self._client.post("/notificaciones/entregas-avisadas", json=body.model_dump(mode="json"))
+        )
+        if response.is_error:
+            self._lanzar_error(response)
+
+    async def patch_notificacion(
+        self, notificacion_id: int, estado: str, error: str | None = None, wamid: str | None = None
+    ) -> None:
+        body = PatchNotificacionRequest(estado=estado, error=error, wamid=wamid)
         response = await self._pedir(
             lambda: self._client.patch(
                 f"/notificaciones/{notificacion_id}", json=body.model_dump(mode="json")

@@ -42,7 +42,15 @@ class EnvioRealizado:
 
     @property
     def entregado(self) -> bool:
-        return self.canal != "wa_me_link"
+        """Solo el mock se da por entregado en el acto. Con Cloud API, Meta
+        aceptar el mensaje NO es que llegó: el resultado real lo informa por
+        webhook y se avisa aparte (ver `notificaciones.entregas`). Un link
+        wa.me tampoco es una entrega, hay que abrirlo."""
+        return self.canal not in ("wa_me_link", "cloud_api")
+
+    @property
+    def esperando_confirmacion(self) -> bool:
+        return self.canal == "cloud_api"
 
 
 @dataclass
@@ -115,7 +123,7 @@ async def _procesar_una(
                 detalle=notificacion.detalle,
             )
         )
-        await _marcar(cliente, notificacion.id, "enviada", None, resumen)
+        await _marcar(cliente, notificacion.id, "enviada", None, resumen, resultado.mensaje_id)
     else:
         resumen.fallos.append((notificacion.socio_nombre, resultado.error))
         await _marcar(cliente, notificacion.id, "fallida", resultado.error, resumen)
@@ -195,9 +203,10 @@ async def _marcar(
     estado: str,
     error: str | None,
     resumen: ResumenProcesamiento,
+    wamid: str | None = None,
 ) -> None:
     try:
-        await cliente.patch_notificacion(notificacion_id, estado, error)
+        await cliente.patch_notificacion(notificacion_id, estado, error, wamid)
     except ApiError as exc:
         logger.warning(
             "No se pudo actualizar el estado de la notificación %s: %s",

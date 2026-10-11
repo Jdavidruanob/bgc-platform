@@ -5,7 +5,15 @@ from coop_bot.adaptadores import telegram as bot_telegram
 from coop_bot.config import Config
 from coop_bot.dialogo.estados import EstadoDialogo, SesionDialogo
 from coop_contracts.intenciones import IntConsultarCaja, IntCrearCredito
-from coop_contracts.respuestas import CajaEstado, SocioDetalle, SocioSearchItem, SociosSearchResponse
+from coop_contracts.respuestas import (
+    CajaEstado,
+    EntregaPorAvisar,
+    EntregasPorAvisarResponse,
+    SocioDetalle,
+    SocioSearchItem,
+    SociosSearchResponse,
+)
+from telegram.error import TelegramError
 
 OPERADOR_CHAT_ID = 999
 
@@ -181,3 +189,48 @@ async def test_ayuda_credito_explica_que_necesita() -> None:
     _, kwargs = context.bot.send_message.call_args
     assert "crédito" in kwargs["text"].lower()
     assert "cuotas" in kwargs["text"].lower()
+
+
+# ── Aviso de la entrega real por WhatsApp ───────────────────────────────────
+
+
+def _entregas(*resultados: str) -> EntregasPorAvisarResponse:
+    return EntregasPorAvisarResponse(
+        entregas=[
+            EntregaPorAvisar(id=i + 1, socio_nombre="Pedro Gómez", resultado=r, error="131042: pago")
+            for i, r in enumerate(resultados)
+        ]
+    )
+
+
+async def test_avisar_entregas_envia_a_telegram_y_marca_avisadas() -> None:
+    context = _contexto()
+    context.bot_data["api_client"].get_entregas_por_avisar = AsyncMock(return_value=_entregas("failed"))
+
+    await bot_telegram._avisar_entregas(context)
+
+    context.bot.send_message.assert_awaited_once()
+    texto = context.bot.send_message.call_args.kwargs["text"]
+    assert "NO les llegó" in texto and "método de pago" in texto
+    context.bot_data["api_client"].marcar_entregas_avisadas.assert_awaited_once_with([1])
+
+
+async def test_avisar_entregas_sin_novedades_no_envia_nada() -> None:
+    context = _contexto()
+    context.bot_data["api_client"].get_entregas_por_avisar = AsyncMock(return_value=_entregas())
+
+    await bot_telegram._avisar_entregas(context)
+
+    context.bot.send_message.assert_not_called()
+    context.bot_data["api_client"].marcar_entregas_avisadas.assert_not_called()
+
+
+async def test_avisar_entregas_no_marca_si_telegram_falla() -> None:
+    """Si el aviso no salió, queda pendiente para el siguiente ciclo."""
+    context = _contexto()
+    context.bot_data["api_client"].get_entregas_por_avisar = AsyncMock(return_value=_entregas("delivered"))
+    context.bot.send_message = AsyncMock(side_effect=TelegramError("sin red"))
+
+    await bot_telegram._avisar_entregas(context)
+
+    context.bot_data["api_client"].marcar_entregas_avisadas.assert_not_called()

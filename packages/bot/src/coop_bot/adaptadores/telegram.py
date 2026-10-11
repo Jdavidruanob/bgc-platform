@@ -16,6 +16,7 @@ from typing import cast
 
 from coop_contracts.notificador import Notificador
 from telegram import InputFile, Update
+from telegram.error import TelegramError
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from coop_bot import entorno
@@ -30,6 +31,7 @@ from coop_bot.dialogo.estados import (
 )
 from coop_bot.nlu.llm_client import LlmClient
 from coop_bot.nlu.whisper_client import WhisperClient
+from coop_bot.notificaciones.entregas import consultar_entregas
 from coop_bot.notificaciones.procesador import ResumenProcesamiento, procesar_pendientes
 
 logger = logging.getLogger(__name__)
@@ -139,6 +141,32 @@ async def _on_procesar_notificaciones(context: ContextTypes.DEFAULT_TYPE) -> Non
         for chat_id in _config(context).telegram_operador_chat_ids:
             await enviar_texto(context, chat_id, aviso)
 
+    await _avisar_entregas(context)
+
+
+async def _avisar_entregas(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Le cuenta al operador lo que Meta informó de la entrega real (llegó, no
+    llegó y por qué, o sin confirmación). Solo se marca como avisado si el
+    mensaje salió a Telegram: si falla, se reintenta en el siguiente ciclo."""
+    cliente = _api_client(context)
+    texto, ids = await consultar_entregas(cliente)
+    if not texto:
+        return
+    enviado = False
+    for chat_id in _config(context).telegram_operador_chat_ids:
+        try:
+            await enviar_texto(context, chat_id, texto)
+            enviado = True
+        except TelegramError:
+            logger.exception("No se pudo avisar la entrega de WhatsApp al chat %s", chat_id)
+    if not enviado:
+        return
+    try:
+        await cliente.marcar_entregas_avisadas(ids)
+    except ApiError as exc:
+        # Peor caso: se repite el aviso en el siguiente ciclo. Mejor que perderlo.
+        logger.warning("No se pudo marcar las entregas como avisadas: %s", exc.mensaje)
+
 
 async def _on_generar_recordatorios_mora(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Encola los recordatorios de mora próxima (cuotas que hoy cumplen su
@@ -200,7 +228,9 @@ def _texto_aviso_operador(resumen: ResumenProcesamiento) -> str:
 
     # El fallback wa.me no envía nada por sí solo: genera un link que alguien
     # tiene que abrir. Se reporta aparte para no dar por entregado lo que no lo está.
-    pendientes_manuales = [e for e in resumen.envios if not e.entregado]
+    # Lo aceptado por Cloud API tampoco se da por entregado aquí: su resultado
+    # real llega después por webhook (ver `_avisar_entregas`).
+    pendientes_manuales = [e for e in resumen.envios if e.canal == "wa_me_link"]
     if pendientes_manuales:
         if lineas:
             lineas.append("")
