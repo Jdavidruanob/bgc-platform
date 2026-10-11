@@ -3,6 +3,9 @@ from coop_contracts.respuestas import (
     BorradoresResponse,
     BorradorNotificacion,
     DocumentoNotificacionRequest,
+    EntregaPorAvisar,
+    EntregasAvisadasRequest,
+    EntregasPorAvisarResponse,
     NotificacionesPendientesResponse,
     NotificacionPendiente,
     PatchNotificacionRequest,
@@ -38,6 +41,38 @@ def get_pendientes(db: DbDep, _auth: AuthDep) -> NotificacionesPendientesRespons
         for r in rows
     ]
     return NotificacionesPendientesResponse(notificaciones=notifs)
+
+
+# Minutos que se espera el estado de entrega de Meta antes de avisar que no hubo confirmación.
+MINUTOS_SIN_CONFIRMACION = 30
+
+
+@router.get("/entregas-por-avisar")
+def get_entregas_por_avisar(db: DbDep, _auth: AuthDep) -> EntregasPorAvisarResponse:
+    """Resultado real (entregado / fallido / sin confirmación) de los mensajes
+    que Meta aceptó y de los que todavía no se le avisó al operador."""
+    rows = NotificacionesRepository(db).find_entregas_por_avisar(MINUTOS_SIN_CONFIRMACION)
+    return EntregasPorAvisarResponse(
+        entregas=[
+            EntregaPorAvisar(
+                id=int(r["id"]),
+                socio_nombre=_nombre(r),
+                resultado=str(r["resultado"]),
+                documento_tipo=str(r["documento_tipo"]) if r.get("documento_tipo") else None,
+                detalle=str(r["detalle"]) if r.get("detalle") else None,
+                error=str(r["entrega_error"]) if r.get("entrega_error") else None,
+            )
+            for r in rows
+        ]
+    )
+
+
+@router.post("/entregas-avisadas", status_code=200)
+def post_entregas_avisadas(body: EntregasAvisadasRequest, db: DbDep, _auth: AuthDep) -> dict[str, object]:
+    """El bot ya le avisó al operador de estas entregas: no se vuelven a listar."""
+    NotificacionesRepository(db).marcar_entregas_avisadas(body.ids)
+    db.commit()
+    return {"avisadas": len(body.ids)}
 
 
 @router.get("/borradores/{documento_tipo}/{documento_id}")
@@ -86,6 +121,6 @@ def patch_notificacion(
     _auth: AuthDep,
 ) -> dict[str, object]:
     repo = NotificacionesRepository(db)
-    repo.update_estado(notif_id, body.estado, body.error)
+    repo.update_estado(notif_id, body.estado, body.error, body.wamid)
     db.commit()
     return {"id": notif_id, "estado": body.estado}

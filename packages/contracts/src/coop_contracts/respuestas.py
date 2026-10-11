@@ -287,6 +287,30 @@ class NotificacionesPendientesResponse(BaseModel):
 class PatchNotificacionRequest(BaseModel):
     estado: str  # "enviada" | "fallida"
     error: str | None = None
+    # wamid que devolvió Meta al aceptar el envío; permite cruzarlo después con
+    # los estados de entrega (`statuses`) que llegan por el webhook.
+    wamid: str | None = None
+
+
+class EntregaPorAvisar(BaseModel):
+    """Resultado REAL de una notificación de WhatsApp, pendiente de avisarle al
+    operador. `resultado`: 'delivered' | 'failed' | 'sin_confirmacion' (Meta
+    aceptó el mensaje pero no informó ningún estado a tiempo)."""
+
+    id: int
+    socio_nombre: str
+    resultado: str
+    documento_tipo: str | None = None
+    detalle: str | None = None
+    error: str | None = None
+
+
+class EntregasPorAvisarResponse(BaseModel):
+    entregas: list[EntregaPorAvisar]
+
+
+class EntregasAvisadasRequest(BaseModel):
+    ids: list[int]
 
 
 class BorradorNotificacion(BaseModel):

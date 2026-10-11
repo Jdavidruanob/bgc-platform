@@ -113,7 +113,13 @@ CREATE TABLE IF NOT EXISTS notificaciones_whatsapp (
     documento_id        INTEGER,
     -- Resumen de la operación en UNA sola línea, para usarlo como variable de
     -- la plantilla de Meta (las variables no admiten saltos de línea).
-    detalle             TEXT
+    detalle             TEXT,
+    -- Entrega real en WhatsApp. `estado` solo dice que Meta aceptó el envío;
+    -- lo que pasó después lo informa Meta por webhook (`statuses`).
+    wamid               TEXT,
+    entrega_estado      TEXT,   -- 'sent' | 'delivered' | 'failed'
+    entrega_error       TEXT,   -- 'codigo: titulo' cuando falló
+    entrega_aviso_at    TIMESTAMP  -- cuándo se le avisó al operador por Telegram
 );
 
 CREATE TABLE IF NOT EXISTS idempotency_keys (
@@ -179,6 +185,11 @@ MIGRATIONS_POSTGRES: tuple[str, ...] = (
     "ALTER TABLE notificaciones_whatsapp ADD COLUMN IF NOT EXISTS documento_tipo TEXT",
     "ALTER TABLE notificaciones_whatsapp ADD COLUMN IF NOT EXISTS documento_id INTEGER",
     "ALTER TABLE notificaciones_whatsapp ADD COLUMN IF NOT EXISTS detalle TEXT",
+    "ALTER TABLE notificaciones_whatsapp ADD COLUMN IF NOT EXISTS wamid TEXT",
+    "ALTER TABLE notificaciones_whatsapp ADD COLUMN IF NOT EXISTS entrega_estado TEXT",
+    "ALTER TABLE notificaciones_whatsapp ADD COLUMN IF NOT EXISTS entrega_error TEXT",
+    "ALTER TABLE notificaciones_whatsapp ADD COLUMN IF NOT EXISTS entrega_aviso_at TIMESTAMP",
+    "CREATE INDEX IF NOT EXISTS idx_notificaciones_wamid ON notificaciones_whatsapp (wamid)",
     "ALTER TABLE socios ADD COLUMN IF NOT EXISTS activo INTEGER DEFAULT 1",
     "ALTER TABLE liquidaciones ADD COLUMN IF NOT EXISTS mora_exenta INTEGER DEFAULT 0",
     "ALTER TABLE detalle_recibo ADD COLUMN IF NOT EXISTS papeleria INTEGER DEFAULT 0",

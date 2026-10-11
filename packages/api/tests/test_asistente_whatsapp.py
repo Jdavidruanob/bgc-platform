@@ -441,7 +441,9 @@ def test_status_delivered_se_registra_como_info(
             _sobre(statuses=[{"id": "wamid.ok", "status": "delivered", "recipient_id": "573001234567"}]),
         )
 
-    assert [x.levelname for x in caplog.records if "wamid.ok" in x.getMessage()] == ["INFO"]
+    registros = [x for x in caplog.records if "wamid.ok" in x.getMessage()]
+    assert registros and {x.levelname for x in registros} == {"INFO"}
+    assert any("estado=delivered" in x.getMessage() for x in registros)
 
 
 def test_nota_de_voz(client: TestClient, db_conn: Any, cliente_wa: Any) -> None:
@@ -511,3 +513,70 @@ def test_liq_si_un_credito_ofrece_seguimiento(
     _, texto, botones = cliente_wa.botones[0]
     assert "preparando" in texto.lower()
     assert [b.id for b in botones] == ["fin:otra", "fin:no"]
+
+
+# ── El estado de entrega se guarda en la notificación ───────────────────────
+
+
+def _notificacion_enviada(db_conn: Any, wamid: str) -> int:
+    from coop_core.repositories.notificaciones_repo import NotificacionesRepository
+
+    sid = _crear_socio(db_conn, "Pedro Antonio", "Gómez Ruiz", "3001234567", NUM_PEDRO_E164)
+    repo = NotificacionesRepository(db_conn)
+    nid = repo.create(sid, NUM_PEDRO_E164, "hola", "recordatorio_cuota", 1, "{}")
+    repo.update_estado(nid, "enviada", None, wamid)
+    db_conn.commit()
+    return nid
+
+
+def _entrega_guardada(db_conn: Any, nid: int) -> tuple[Any, Any]:
+    fila = (
+        db_conn.cursor()
+        .execute("SELECT entrega_estado, entrega_error FROM notificaciones_whatsapp WHERE id = %s", (nid,))
+        .fetchone()
+    )
+    return fila[0], fila[1]
+
+
+def test_webhook_guarda_delivered_en_la_notificacion(client: TestClient, db_conn: Any) -> None:
+    nid = _notificacion_enviada(db_conn, "wamid.E1")
+    r = _post(
+        client, _sobre(statuses=[{"id": "wamid.E1", "status": "delivered", "recipient_id": NUM_PEDRO_META}])
+    )
+    assert r.status_code == 200
+    assert _entrega_guardada(db_conn, nid) == ("delivered", None)
+
+
+def test_webhook_guarda_failed_con_el_codigo_de_meta(client: TestClient, db_conn: Any) -> None:
+    nid = _notificacion_enviada(db_conn, "wamid.E2")
+    estado = {
+        "id": "wamid.E2",
+        "status": "failed",
+        "recipient_id": NUM_PEDRO_META,
+        "errors": [{"code": 131042, "title": "Business eligibility payment issue"}],
+    }
+    _post(client, _sobre(statuses=[estado]))
+    assert _entrega_guardada(db_conn, nid) == ("failed", "131042: Business eligibility payment issue")
+
+
+def test_webhook_con_wamid_desconocido_responde_200(client: TestClient) -> None:
+    r = _post(client, _sobre(statuses=[{"id": "wamid.NADA", "status": "delivered"}]))
+    assert r.status_code == 200
+
+
+def test_webhook_sigue_atendiendo_mensajes_aunque_falle_guardar_el_estado(
+    client: TestClient, db_conn: Any, cliente_wa: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from coop_core.repositories.notificaciones_repo import NotificacionesRepository
+
+    def _roto(*args: Any, **kwargs: Any) -> bool:
+        raise RuntimeError("base caída")
+
+    monkeypatch.setattr(NotificacionesRepository, "registrar_entrega", _roto)
+    _crear_socio(db_conn, "Pedro Antonio", "Gómez Ruiz", "3001234567", NUM_PEDRO_E164)
+    payload = _sobre(
+        [_msg_texto(NUM_PEDRO_META, "Hola")], statuses=[{"id": "wamid.X", "status": "delivered"}]
+    )
+    r = _post(client, payload)
+    assert r.status_code == 200
+    assert cliente_wa.botones or cliente_wa.textos  # el asistente respondió igual

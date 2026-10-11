@@ -1,6 +1,7 @@
 """Tests de integración de coop-api con SQLite en memoria."""
 
 import uuid
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -841,3 +842,62 @@ def test_fuzzy_brecha_amplia_cuando_solo_el_nombre_distingue():
         score_nombre("Marcela Salazar Flores", "Isabella García", "Salazar"),
     )
     assert ganador2 - segundo2 >= 0.15
+
+
+# ── Entregas reales de WhatsApp ──────────────────────────────────────────────
+
+
+def _notif_con_wamid(db_conn: Any, wamid: str) -> int:
+    from coop_core.repositories.notificaciones_repo import NotificacionesRepository
+    from coop_core.repositories.socios_repo import SociosRepository
+
+    sid = SociosRepository(db_conn).save("Ana", "Pérez", None, None, 0)
+    repo = NotificacionesRepository(db_conn)
+    nid = repo.create(sid, "+573001112233", "hola", "recordatorio_cuota", 7, '{"numero_cuota": "3"}')
+    repo.update_estado(nid, "enviada", None, wamid)
+    db_conn.commit()
+    return nid
+
+
+def test_patch_notificacion_guarda_el_wamid(client: TestClient, db_conn: Any):
+    from coop_core.repositories.notificaciones_repo import NotificacionesRepository
+    from coop_core.repositories.socios_repo import SociosRepository
+
+    sid = SociosRepository(db_conn).save("Ana", "Pérez", None, None, 0)
+    nid = NotificacionesRepository(db_conn).create(sid, "+573001112233", "hola")
+    db_conn.commit()
+    r = client.patch(f"/notificaciones/{nid}", json={"estado": "enviada", "wamid": "wamid.Z"}, headers=AUTH)
+    assert r.status_code == 200
+    fila = (
+        db_conn.cursor().execute("SELECT wamid FROM notificaciones_whatsapp WHERE id = %s", (nid,)).fetchone()
+    )
+    assert fila[0] == "wamid.Z"
+
+
+def test_entregas_por_avisar_y_marcarlas_avisadas(client: TestClient, db_conn: Any):
+    from coop_core.repositories.notificaciones_repo import NotificacionesRepository
+
+    nid = _notif_con_wamid(db_conn, "wamid.W1")
+    assert client.get("/notificaciones/entregas-por-avisar", headers=AUTH).json()["entregas"] == []
+
+    NotificacionesRepository(db_conn).registrar_entrega("wamid.W1", "failed", "131042: pago")
+    db_conn.commit()
+    entregas = client.get("/notificaciones/entregas-por-avisar", headers=AUTH).json()["entregas"]
+    assert entregas == [
+        {
+            "id": nid,
+            "socio_nombre": "Ana Pérez",
+            "resultado": "failed",
+            "documento_tipo": "recordatorio_cuota",
+            "detalle": '{"numero_cuota": "3"}',
+            "error": "131042: pago",
+        }
+    ]
+
+    r = client.post("/notificaciones/entregas-avisadas", json={"ids": [nid]}, headers=AUTH)
+    assert r.status_code == 200
+    assert client.get("/notificaciones/entregas-por-avisar", headers=AUTH).json()["entregas"] == []
+
+
+def test_entregas_por_avisar_exige_autenticacion(client: TestClient):
+    assert client.get("/notificaciones/entregas-por-avisar").status_code in (401, 403)

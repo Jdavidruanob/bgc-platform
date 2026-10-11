@@ -19,6 +19,7 @@ import logging
 from typing import Any
 
 from coop_core.db.connection import DbConnection
+from coop_core.repositories.notificaciones_repo import NotificacionesRepository
 from coop_core.repositories.socios_repo import SociosRepository
 from fastapi import APIRouter, BackgroundTasks, Query, Request, Response
 
@@ -87,7 +88,7 @@ def _procesar(
     cfg: ConfigAsistente,
     payload: Any,
 ) -> None:
-    _registrar_estados(payload)
+    _registrar_estados(payload, db)
     socios_repo = SociosRepository(db)
     for mensaje in parsear_mensajes(payload):
         numero_e164 = mensaje.numero if mensaje.numero.startswith("+") else f"+{mensaje.numero}"
@@ -102,22 +103,34 @@ def _procesar(
         flujo.atender(db, cliente, background, numero_e164, socio, mensaje)
 
 
-def _registrar_estados(payload: Any) -> None:
-    """Deja en el log lo que Meta dice de los mensajes que enviamos. Un
-    'failed' va a WARNING: es el caso en que Meta aceptó el envío pero no lo
-    entregó (ej. 131049, 131026), y no hay otro rastro de eso."""
+def _registrar_estados(payload: Any, db: DbConnection) -> None:
+    """Guarda en la notificación (por wamid) lo que Meta dice de los mensajes
+    que enviamos, y lo deja en el log. Un 'failed' va a WARNING: es el caso en
+    que Meta aceptó el envío pero no lo entregó (ej. 131042, 131049, 131026).
+    El bot lee de ahí para avisarle al operador por Telegram.
+
+    Un fallo al guardar nunca debe impedir atender los mensajes entrantes del
+    asistente, que se procesan después con el mismo payload."""
+    repo = NotificacionesRepository(db)
     for st in parsear_estados(payload):
+        destino = st.destinatario[-4:]
+        errores = "; ".join(st.errores)
         if st.estado == "failed":
             logger.warning(
                 "WhatsApp NO entregado wamid=%s destino=***%s errores=%s",
                 st.mensaje_id,
-                st.destinatario[-4:],
-                "; ".join(st.errores) or "(sin detalle)",
+                destino,
+                errores or "(sin detalle)",
             )
         else:
-            logger.info(
-                "WhatsApp estado=%s wamid=%s destino=***%s", st.estado, st.mensaje_id, st.destinatario[-4:]
-            )
+            logger.info("WhatsApp estado=%s wamid=%s destino=***%s", st.estado, st.mensaje_id, destino)
+        try:
+            if not repo.registrar_entrega(st.mensaje_id, st.estado, errores or None):
+                logger.info("Estado '%s' de un wamid sin notificación (%s)", st.estado, st.mensaje_id)
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("No se pudo guardar el estado de entrega de %s", st.mensaje_id)
 
 
 def _firma_valida(cuerpo: bytes, firma_header: str | None, app_secret: str) -> bool:
