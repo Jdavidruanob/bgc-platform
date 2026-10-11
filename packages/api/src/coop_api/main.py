@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from coop_api import entorno
+from coop_api.arranque import aplicar_esquema
 from coop_api.postgres_schema import CONFIG_DEFAULTS, MIGRATIONS_POSTGRES, SCHEMA_POSTGRES
 from coop_api.routers import (
     caja,
@@ -33,16 +34,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if db_url:
         import psycopg
 
-        with psycopg.connect(db_url) as conn:
-            conn.execute(SCHEMA_POSTGRES)
-            for migration in MIGRATIONS_POSTGRES:
-                conn.execute(migration)
-            for key, value in CONFIG_DEFAULTS.items():
-                conn.execute(
-                    "INSERT INTO config (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING",
-                    (key, value),
-                )
-            conn.commit()
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            aplicar_esquema(conn, SCHEMA_POSTGRES, MIGRATIONS_POSTGRES, CONFIG_DEFAULTS)
     yield
 
 
