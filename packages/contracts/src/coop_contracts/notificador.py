@@ -10,6 +10,7 @@ class ResultadoEnvio(BaseModel):
     canal: str  # "cloud_api" | "wa_me_link" | "mock"
     wa_me_url: str | None = None
     error: str | None = None
+    mensaje_id: str | None = None  # wamid que devuelve Meta; permite cruzar con los `statuses` del webhook
 
 
 class ParamsPlantilla(BaseModel):

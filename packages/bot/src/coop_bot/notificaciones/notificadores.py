@@ -78,7 +78,7 @@ class CloudApiNotificador:
 
         if respuesta.is_error:
             return ResultadoEnvio(exitoso=False, canal="cloud_api", error=_extraer_error_meta(respuesta))
-        return ResultadoEnvio(exitoso=True, canal="cloud_api")
+        return _resultado_aceptado(respuesta, numero_e164)
 
     def enviar_documento(
         self,
@@ -130,7 +130,7 @@ class CloudApiNotificador:
 
         if respuesta.is_error:
             return ResultadoEnvio(exitoso=False, canal="cloud_api", error=_extraer_error_meta(respuesta))
-        return ResultadoEnvio(exitoso=True, canal="cloud_api")
+        return _resultado_aceptado(respuesta, numero_e164)
 
     def enviar_recordatorio(
         self, numero_e164: str, texto: str, plantilla: ParamsRecordatorio | None = None
@@ -152,7 +152,7 @@ class CloudApiNotificador:
                 return ResultadoEnvio(exitoso=False, canal="cloud_api", error=str(exc))
             if respuesta.is_error:
                 return ResultadoEnvio(exitoso=False, canal="cloud_api", error=_extraer_error_meta(respuesta))
-            return ResultadoEnvio(exitoso=True, canal="cloud_api")
+            return _resultado_aceptado(respuesta, numero_e164)
         return self.enviar(numero_e164, texto)
 
     def _payload_plantilla_recordatorio(self, destino: str, params: ParamsRecordatorio) -> dict[str, Any]:
@@ -313,6 +313,27 @@ def construir_notificador(config: Config) -> Notificador:
         "presente" if config.whatsapp_phone_number_id else "FALTANTE",
     )
     return fallback
+
+
+def _resultado_aceptado(respuesta: httpx.Response, numero_e164: str) -> ResultadoEnvio:
+    """Meta respondió 2xx: aceptó el mensaje, lo que NO garantiza que se
+    entregue (eso lo dicen los `statuses` del webhook). Se registra el wamid
+    para poder cruzarlo con ese evento."""
+    mensaje_id = _extraer_mensaje_id(respuesta)
+    logger.info("Meta aceptó el mensaje wamid=%s destino=***%s", mensaje_id, numero_e164[-4:])
+    return ResultadoEnvio(exitoso=True, canal="cloud_api", mensaje_id=mensaje_id)
+
+
+def _extraer_mensaje_id(respuesta: httpx.Response) -> str | None:
+    try:
+        cuerpo = respuesta.json()
+    except ValueError:
+        return None
+    mensajes = cuerpo.get("messages") if isinstance(cuerpo, dict) else None
+    if isinstance(mensajes, list) and mensajes and isinstance(mensajes[0], dict):
+        mensaje_id = mensajes[0].get("id")
+        return str(mensaje_id) if mensaje_id else None
+    return None
 
 
 def _extraer_error_meta(respuesta: httpx.Response) -> str:

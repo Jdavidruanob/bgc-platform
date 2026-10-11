@@ -37,6 +37,9 @@ def main() -> None:
         level=getattr(logging, config.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    # httpx registra la URL completa de cada petición, y la de Telegram lleva
+    # el token del bot en el path: a INFO se filtraría a los logs.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
     logging.getLogger(__name__).info(
         "Entorno: %s · API: %s", entorno.etiqueta(config.app_env), config.coop_api_base_url

@@ -44,6 +44,17 @@ def test_cloud_api_notificador_envio_exitoso() -> None:
 
     assert resultado.exitoso is True
     assert resultado.canal == "cloud_api"
+    assert resultado.mensaje_id == "wamid.1"
+
+
+def test_cloud_api_notificador_sin_id_en_la_respuesta_sigue_siendo_exitoso() -> None:
+    notificador = CloudApiNotificador(
+        token="t", phone_number_id="1", transport=httpx.MockTransport(lambda r: httpx.Response(200, json={}))
+    )
+    resultado = notificador.enviar("+573112223344", "hola")
+
+    assert resultado.exitoso is True
+    assert resultado.mensaje_id is None
 
 
 def test_cloud_api_notificador_rechazado_por_meta_no_es_exitoso() -> None:
