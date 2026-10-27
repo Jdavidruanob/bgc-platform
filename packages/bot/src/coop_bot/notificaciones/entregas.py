@@ -93,12 +93,13 @@ def texto_entregas(entregas: list[EntregaPorAvisar]) -> str:
     return "\n\n".join(bloques)
 
 
-async def consultar_entregas(cliente: ApiClient) -> tuple[str, list[int]]:
-    """(texto del aviso, ids incluidos). Si la API no responde devuelve vacío:
+async def consultar_entregas(cliente: ApiClient) -> tuple[str, list[int], list[str]]:
+    """(texto del aviso, ids incluidos, nombres de los socios). Si la API no responde devuelve vacío:
     se reintenta en el siguiente ciclo, no se pierde nada."""
     try:
         respuesta = await cliente.get_entregas_por_avisar()
     except ApiError as exc:
         logger.warning("No se pudo consultar las entregas de WhatsApp: %s", exc.mensaje)
-        return "", []
-    return texto_entregas(respuesta.entregas), [e.id for e in respuesta.entregas]
+        return "", [], []
+    entregas = respuesta.entregas
+    return texto_entregas(entregas), [e.id for e in entregas], [e.socio_nombre for e in entregas]

@@ -38,6 +38,19 @@ class LlmClient:
         contenido = respuesta.choices[0].message.content
         return self._parsear(contenido, texto)
 
+    async def completar(self, sistema: str, usuario: str) -> str | None:
+        """Texto libre (no JSON): lo usa el redactor de avisos al operador.
+        Temperatura alta a propósito, para que el saludo varíe cada día."""
+        respuesta = await self._client.chat.completions.create(
+            model=self._modelo,
+            temperature=0.9,
+            messages=[
+                {"role": "system", "content": sistema},
+                {"role": "user", "content": usuario},
+            ],
+        )
+        return respuesta.choices[0].message.content
+
     def _parsear(self, contenido: str | None, texto_original: str) -> Intencion:
         if contenido is None:
             return IntDesconocida(intencion="desconocida", texto_original=texto_original)

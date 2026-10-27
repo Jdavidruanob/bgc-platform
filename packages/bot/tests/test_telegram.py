@@ -39,6 +39,7 @@ def _contexto(chat_data: dict | None = None) -> MagicMock:
     }
     context.bot.send_message = AsyncMock()
     context.bot.send_document = AsyncMock()
+    context.bot.get_chat = AsyncMock(side_effect=TelegramError("sin chat"))
     context.job_queue = MagicMock()
     context.job_queue.get_jobs_by_name.return_value = []
     return context
@@ -213,6 +214,22 @@ async def test_avisar_entregas_envia_a_telegram_y_marca_avisadas() -> None:
     texto = context.bot.send_message.call_args.kwargs["text"]
     assert "NO les llegó" in texto and "método de pago" in texto
     context.bot_data["api_client"].marcar_entregas_avisadas.assert_awaited_once_with([1])
+
+
+async def test_avisar_entregas_redactado_por_el_llm_saluda_al_operador() -> None:
+    context = _contexto()
+    context.bot.get_chat = AsyncMock(return_value=MagicMock(first_name="Álvaro"))
+    context.bot_data["api_client"].get_entregas_por_avisar = AsyncMock(return_value=_entregas("delivered"))
+    context.bot_data["llm_client"].completar = AsyncMock(
+        return_value="Hola Álvaro 👋 A Pedro Gómez ya le llegó su comprobante."
+    )
+
+    await bot_telegram._avisar_entregas(context)
+
+    texto = context.bot.send_message.call_args.kwargs["text"]
+    assert texto.endswith("Hola Álvaro 👋 A Pedro Gómez ya le llegó su comprobante.")
+    sistema = context.bot_data["llm_client"].completar.call_args.args[0]
+    assert "Álvaro" in sistema
 
 
 async def test_avisar_entregas_sin_novedades_no_envia_nada() -> None:

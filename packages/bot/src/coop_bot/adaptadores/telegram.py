@@ -33,6 +33,7 @@ from coop_bot.nlu.llm_client import LlmClient
 from coop_bot.nlu.whisper_client import WhisperClient
 from coop_bot.notificaciones.entregas import consultar_entregas
 from coop_bot.notificaciones.procesador import ResumenProcesamiento, procesar_pendientes
+from coop_bot.notificaciones.redactor import redactar
 
 logger = logging.getLogger(__name__)
 
@@ -138,8 +139,9 @@ async def _on_procesar_notificaciones(context: ContextTypes.DEFAULT_TYPE) -> Non
 
     aviso = _texto_aviso_operador(resumen)
     if aviso:
+        nombres = [e.socio_nombre for e in resumen.envios] + [n for n, _ in resumen.fallos]
         for chat_id in _config(context).telegram_operador_chat_ids:
-            await enviar_texto(context, chat_id, aviso)
+            await enviar_texto(context, chat_id, await _con_personalidad(context, chat_id, aviso, nombres))
 
     await _avisar_entregas(context)
 
@@ -149,13 +151,13 @@ async def _avisar_entregas(context: ContextTypes.DEFAULT_TYPE) -> None:
     llegó y por qué, o sin confirmación). Solo se marca como avisado si el
     mensaje salió a Telegram: si falla, se reintenta en el siguiente ciclo."""
     cliente = _api_client(context)
-    texto, ids = await consultar_entregas(cliente)
+    texto, ids, nombres = await consultar_entregas(cliente)
     if not texto:
         return
     enviado = False
     for chat_id in _config(context).telegram_operador_chat_ids:
         try:
-            await enviar_texto(context, chat_id, texto)
+            await enviar_texto(context, chat_id, await _con_personalidad(context, chat_id, texto, nombres))
             enviado = True
         except TelegramError:
             logger.exception("No se pudo avisar la entrega de WhatsApp al chat %s", chat_id)
@@ -166,6 +168,29 @@ async def _avisar_entregas(context: ContextTypes.DEFAULT_TYPE) -> None:
     except ApiError as exc:
         # Peor caso: se repite el aviso en el siguiente ciclo. Mejor que perderlo.
         logger.warning("No se pudo marcar las entregas como avisadas: %s", exc.mensaje)
+
+
+async def _con_personalidad(
+    context: ContextTypes.DEFAULT_TYPE, chat_id: int, texto: str, nombres: list[str]
+) -> str:
+    """El aviso redactado por el LLM, saludando al operador por su nombre de
+    Telegram. Si algo falla, el texto fijo (ver `redactor.redactar`)."""
+    return await redactar(
+        texto, context.bot_data.get("llm_client"), nombres, await _nombre_operador_del_chat(context, chat_id)
+    )
+
+
+async def _nombre_operador_del_chat(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> str | None:
+    """Primer nombre del operador en Telegram (sin un `update` a mano, porque
+    estos avisos salen de jobs), consultado una vez y guardado."""
+    cache: dict[int, str | None] = context.bot_data.setdefault("nombres_operador", {})
+    if chat_id not in cache:
+        try:
+            chat = await context.bot.get_chat(chat_id)
+            cache[chat_id] = chat.first_name or None
+        except TelegramError:
+            return None
+    return cache[chat_id]
 
 
 async def _on_generar_recordatorios_mora(context: ContextTypes.DEFAULT_TYPE) -> None:

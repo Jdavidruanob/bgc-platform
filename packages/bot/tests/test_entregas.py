@@ -85,11 +85,12 @@ def test_separa_llegaron_de_fallaron_en_un_mismo_aviso() -> None:
 
 
 async def test_consulta_y_marca_avisadas_contra_la_api(api_client: ApiClient) -> None:
-    assert await consultar_entregas(api_client) == ("", [])
+    assert await consultar_entregas(api_client) == ("", [], [])
 
     mock_server._state["notificaciones"][0].update({"entrega_estado": "delivered"})
-    texto, ids = await consultar_entregas(api_client)
+    texto, ids, nombres = await consultar_entregas(api_client)
     assert "María López Herrera" in texto and ids == [1]
+    assert nombres == ["María López Herrera"]
 
     await api_client.marcar_entregas_avisadas(ids)
-    assert await consultar_entregas(api_client) == ("", [])
+    assert await consultar_entregas(api_client) == ("", [], [])
