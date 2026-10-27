@@ -73,6 +73,8 @@ class ClienteWhatsApp(Protocol):
 
     def enviar_documento(self, numero_e164: str, documento: Documento) -> bool: ...
 
+    def mostrar_escribiendo(self, mensaje_id: str) -> bool: ...
+
 
 class ClienteCloudApi:
     """Implementación real, sobre Meta WhatsApp Cloud API."""
@@ -204,6 +206,20 @@ class ClienteCloudApi:
         }
         return self._post_mensaje(payload)
 
+    def mostrar_escribiendo(self, mensaje_id: str) -> bool:
+        """Marca el mensaje del socio como leído y le muestra "escribiendo…"
+        hasta que llegue la respuesta (Meta lo quita solo a los 25 s). No es
+        un mensaje, así que Meta no lo cobra. Si falla, se responde igual."""
+        if not mensaje_id:
+            return False
+        payload = {
+            "messaging_product": "whatsapp",
+            "status": "read",
+            "message_id": mensaje_id,
+            "typing_indicator": {"type": "text"},
+        }
+        return self._post_mensaje(payload)
+
     def cerrar(self) -> None:
         self._client.close()
 
@@ -229,6 +245,9 @@ class ClienteInactivo:
         logger.warning("Asistente WhatsApp sin credenciales de Meta: no se envió documento a %s", numero_e164)
         return False
 
+    def mostrar_escribiendo(self, mensaje_id: str) -> bool:
+        return False
+
 
 @dataclass
 class ClienteFalso:
@@ -238,6 +257,7 @@ class ClienteFalso:
     botones: list[tuple[str, str, list[Boton]]] = field(default_factory=list)
     listas: list[tuple[str, str, str, list[Fila]]] = field(default_factory=list)
     documentos: list[tuple[str, Documento]] = field(default_factory=list)
+    escribiendo: list[str] = field(default_factory=list)
 
     def enviar_texto(self, numero_e164: str, texto: str) -> bool:
         self.textos.append((numero_e164, texto))
@@ -253,6 +273,10 @@ class ClienteFalso:
 
     def enviar_documento(self, numero_e164: str, documento: Documento) -> bool:
         self.documentos.append((numero_e164, documento))
+        return True
+
+    def mostrar_escribiendo(self, mensaje_id: str) -> bool:
+        self.escribiendo.append(mensaje_id)
         return True
 
 

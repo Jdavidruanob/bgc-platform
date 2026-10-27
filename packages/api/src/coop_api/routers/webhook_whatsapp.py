@@ -116,6 +116,7 @@ def _procesar(
             )
             continue
 
+        cliente.mostrar_escribiendo(mensaje.mensaje_id)
         flujo.atender(db, cliente, background, numero_e164, socio, mensaje)
 
 

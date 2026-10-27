@@ -32,6 +32,27 @@ def test_enviar_texto_payload() -> None:
     assert _cliente(handler).enviar_texto("+573001234567", "hola") is True
 
 
+def test_mostrar_escribiendo_payload() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v20.0/pnid123/messages"
+        assert json.loads(request.read()) == {
+            "messaging_product": "whatsapp",
+            "status": "read",
+            "message_id": "wamid.socio",
+            "typing_indicator": {"type": "text"},
+        }
+        return httpx.Response(200, json={"success": True})
+
+    assert _cliente(handler).mostrar_escribiendo("wamid.socio") is True
+
+
+def test_mostrar_escribiendo_sin_wamid_no_llama_a_meta() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("no debía llamar a Meta")
+
+    assert _cliente(handler).mostrar_escribiendo("") is False
+
+
 def test_enviar_botones_payload() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.read())

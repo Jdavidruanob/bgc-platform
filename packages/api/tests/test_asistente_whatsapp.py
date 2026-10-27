@@ -205,6 +205,20 @@ def test_saludo_socio_conocido(client: TestClient, db_conn: Any, cliente_wa: Any
     assert [b.id for b in botones] == ["menu:aportes", "menu:creditos", "menu:pagos"]
 
 
+def test_socio_ve_escribiendo_antes_de_la_respuesta(
+    client: TestClient, db_conn: Any, cliente_wa: Any
+) -> None:
+    _crear_socio(db_conn, "Pedro Antonio", "Gómez Ruiz", "3001234567", NUM_PEDRO_E164)
+    _post(client, _sobre([_msg_texto(NUM_PEDRO_META, "Hola", wamid="wamid.hola")]))
+    assert cliente_wa.escribiendo == ["wamid.hola"]
+    assert len(cliente_wa.botones) == 1
+
+
+def test_desconocido_no_ve_escribiendo(client: TestClient, cliente_wa: Any) -> None:
+    _post(client, _sobre([_msg_texto(NUM_DESCONOCIDO_META, "Hola", wamid="wamid.x")]))
+    assert cliente_wa.escribiendo == []
+
+
 def test_numero_no_reconocido_no_recibe_respuesta(client: TestClient, cliente_wa: Any) -> None:
     # Contestarle a desconocidos alimentaba un ping-pong con otros bots.
     r = _post(client, _sobre([_msg_texto(NUM_DESCONOCIDO_META, "Hola")]))
