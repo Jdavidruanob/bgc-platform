@@ -22,6 +22,11 @@ from coop_api.routers import (
     webhook_whatsapp,
 )
 
+# Sin esto Python solo muestra WARNING+ y se perdían en producción los INFO
+# de la API (entrantes del asistente, estados de entrega de WhatsApp).
+logging.basicConfig(format="%(levelname)s %(name)s: %(message)s")
+logging.getLogger("coop_api").setLevel(logging.INFO)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
