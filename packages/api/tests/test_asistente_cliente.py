@@ -159,7 +159,7 @@ def test_parsear_quick_reply_de_plantilla() -> None:
     assert resultado[0].boton_id == "menu:aportes"
 
 
-def test_parsear_reaccion_es_otro() -> None:
+def test_parsear_reaccion_se_ignora() -> None:
     mensaje = {
         "from": "573001234567",
         "id": "wamid.1",
@@ -168,7 +168,8 @@ def test_parsear_reaccion_es_otro() -> None:
         "reaction": {"message_id": "wamid.0", "emoji": "👍"},
     }
     resultado = parsear_mensajes(_sobre(mensaje))
-    assert resultado[0].tipo == "otro"
+    assert resultado[0].tipo == "ignorar"
+    assert resultado[0].mensaje_id == "wamid.1"
 
 
 def test_parsear_statuses_no_produce_mensajes() -> None:

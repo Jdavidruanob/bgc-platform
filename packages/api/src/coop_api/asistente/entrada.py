@@ -8,10 +8,14 @@ forma exacta de cada tipo de mensaje.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Literal
 
-TipoMensaje = Literal["texto", "boton", "otro"]
+TipoMensaje = Literal["texto", "boton", "otro", "ignorar"]
+
+# Tipos que no los escribe una persona pidiendo algo: contestarlos solo sirve
+# para alimentar un ping-pong con otro sistema automático.
+_TIPOS_IGNORADOS = frozenset({"reaction", "system", "unsupported", "ephemeral", "request_welcome"})
 
 
 @dataclass(frozen=True)
@@ -21,6 +25,8 @@ class MensajeEntrante:
     tipo: TipoMensaje
     texto: str = ""
     boton_id: str = ""
+    mensaje_id: str = ""
+    """wamid del mensaje entrante; Meta lo repite si reintenta el webhook."""
 
 
 def parsear_mensajes(payload: Any) -> list[MensajeEntrante]:
@@ -106,6 +112,16 @@ def _parsear_uno(msg: Any) -> MensajeEntrante | None:
         return None
 
     tipo = msg.get("type")
+    mensaje = _parsear_tipo(msg, numero, tipo)
+    wamid = msg.get("id")
+    if mensaje is not None and isinstance(wamid, str):
+        mensaje = replace(mensaje, mensaje_id=wamid)
+    return mensaje
+
+
+def _parsear_tipo(msg: dict[str, Any], numero: str, tipo: Any) -> MensajeEntrante | None:
+    if tipo in _TIPOS_IGNORADOS:
+        return MensajeEntrante(numero=numero, tipo="ignorar")
 
     if tipo == "text":
         texto = msg.get("text", {})

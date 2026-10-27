@@ -25,8 +25,8 @@ from fastapi import APIRouter, BackgroundTasks, Query, Request, Response
 
 from coop_api.asistente import flujo
 from coop_api.asistente.config import ConfigAsistente, desde_entorno
-from coop_api.asistente.copy import numero_no_reconocido
 from coop_api.asistente.entrada import parsear_estados, parsear_mensajes
+from coop_api.asistente.limite import limitador
 from coop_api.asistente.whatsapp_cliente import ClienteWaDep, ClienteWhatsApp
 from coop_api.deps import DbDep
 
@@ -92,12 +92,28 @@ def _procesar(
     socios_repo = SociosRepository(db)
     for mensaje in parsear_mensajes(payload):
         numero_e164 = mensaje.numero if mensaje.numero.startswith("+") else f"+{mensaje.numero}"
-        if not cfg.numero_autorizado(numero_e164):
+        enmascarado = f"***{numero_e164[-4:]}"
+        logger.info("WhatsApp entrante de=%s tipo=%s wamid=%s", enmascarado, mensaje.tipo, mensaje.mensaje_id)
+
+        if limitador.ya_visto(mensaje.mensaje_id):
+            logger.info(
+                "WhatsApp entrante repetido (reintento de Meta), se ignora wamid=%s", mensaje.mensaje_id
+            )
+            continue
+        if mensaje.tipo == "ignorar" or not cfg.numero_autorizado(numero_e164):
             continue
 
         socio = socios_repo.find_by_whatsapp_e164(numero_e164)
         if socio is None:
-            cliente.enviar_texto(numero_e164, numero_no_reconocido())
+            # Nunca contestarle a quien no es socio: esa respuesta automática
+            # era la que alimentaba el ping-pong con otros bots (oct 2026).
+            logger.info("WhatsApp de un número que no es socio (%s): no se responde", enmascarado)
+            continue
+
+        if not limitador.permitir(numero_e164):
+            logger.warning(
+                "WhatsApp: %s superó el tope de respuestas del asistente; no se responde", enmascarado
+            )
             continue
 
         flujo.atender(db, cliente, background, numero_e164, socio, mensaje)

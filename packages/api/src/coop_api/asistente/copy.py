@@ -46,15 +46,6 @@ def saludo(socio: dict[str, Any]) -> str:
     )
 
 
-def numero_no_reconocido() -> str:
-    return (
-        "Hola 👋 Soy el asistente de BGC.\n\n"
-        "No encuentro tu número entre nuestros socios registrados, así que no "
-        "puedo darte información por aquí. Si eres socio, comunícate con el "
-        "tesorero para que actualice tu número. 🙏"
-    )
-
-
 def no_puedo_escuchar_audio() -> str:
     return "Por ahora no puedo escuchar notas de voz 🙈 Usa los botones y con gusto te ayudo."
 

@@ -49,6 +49,15 @@ def _numeros_autorizados(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("WHATSAPP_ASISTENTE_NUMEROS", "*")
 
 
+@pytest.fixture(autouse=True)
+def _limitador_limpio() -> Generator[None, None, None]:
+    from coop_api.asistente.limite import limitador
+
+    limitador.reiniciar()
+    yield
+    limitador.reiniciar()
+
+
 def _crear_socio(
     db_conn: Any, nombres: str, apellidos: str, celular: str, whatsapp_e164: str, saldo: int = 0
 ) -> int:
@@ -196,14 +205,61 @@ def test_saludo_socio_conocido(client: TestClient, db_conn: Any, cliente_wa: Any
     assert [b.id for b in botones] == ["menu:aportes", "menu:creditos", "menu:pagos"]
 
 
-def test_numero_no_reconocido_no_revela_nada(client: TestClient, cliente_wa: Any) -> None:
+def test_numero_no_reconocido_no_recibe_respuesta(client: TestClient, cliente_wa: Any) -> None:
+    # Contestarle a desconocidos alimentaba un ping-pong con otros bots.
     r = _post(client, _sobre([_msg_texto(NUM_DESCONOCIDO_META, "Hola")]))
     assert r.status_code == 200
-    assert len(cliente_wa.textos) == 1
-    _, texto = cliente_wa.textos[0]
-    assert "$" not in texto
-    assert "tesorero" in texto.lower()
-    assert cliente_wa.botones == [] and cliente_wa.documentos == []
+    assert cliente_wa.textos == [] and cliente_wa.botones == [] and cliente_wa.documentos == []
+
+
+def test_entrante_se_registra_con_numero_enmascarado(
+    client: TestClient, cliente_wa: Any, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level("INFO", logger="coop_api.routers.webhook_whatsapp"):
+        _post(client, _sobre([_msg_texto(NUM_DESCONOCIDO_META, "Hola", wamid="wamid.log")]))
+    textos = [x.getMessage() for x in caplog.records]
+    assert any("de=***8877" in t and "tipo=texto" in t and "wamid.log" in t for t in textos)
+    assert not any(NUM_DESCONOCIDO_META in t for t in textos)
+
+
+def test_tope_de_respuestas_por_numero(client: TestClient, db_conn: Any, cliente_wa: Any) -> None:
+    from coop_api.asistente.limite import MAX_RESPUESTAS
+
+    _crear_socio(db_conn, "Pedro Antonio", "Gómez Ruiz", "3001234567", NUM_PEDRO_E164)
+    for i in range(MAX_RESPUESTAS + 5):
+        _post(client, _sobre([_msg_texto(NUM_PEDRO_META, "Hola", wamid=f"wamid.t{i}")]))
+    assert len(cliente_wa.botones) == MAX_RESPUESTAS
+
+
+def test_tope_es_por_numero(client: TestClient, db_conn: Any, cliente_wa: Any) -> None:
+    from coop_api.asistente.limite import MAX_RESPUESTAS
+
+    _crear_socio(db_conn, "Pedro Antonio", "Gómez Ruiz", "3001234567", NUM_PEDRO_E164)
+    _crear_socio(db_conn, "María", "López", "3112223344", NUM_MARIA_E164)
+    for i in range(MAX_RESPUESTAS + 2):
+        _post(client, _sobre([_msg_texto(NUM_PEDRO_META, "Hola", wamid=f"wamid.p{i}")]))
+    _post(client, _sobre([_msg_texto(NUM_MARIA_META, "Hola", wamid="wamid.m")]))
+    assert cliente_wa.botones[-1][0] == NUM_MARIA_E164
+
+
+def test_reintento_de_meta_con_mismo_wamid_no_responde_dos_veces(
+    client: TestClient, db_conn: Any, cliente_wa: Any
+) -> None:
+    _crear_socio(db_conn, "Pedro Antonio", "Gómez Ruiz", "3001234567", NUM_PEDRO_E164)
+    sobre = _sobre([_msg_texto(NUM_PEDRO_META, "Hola", wamid="wamid.mismo")])
+    _post(client, sobre)
+    _post(client, sobre)
+    assert len(cliente_wa.botones) == 1
+
+
+@pytest.mark.parametrize("tipo", ["reaction", "system", "unsupported"])
+def test_reacciones_y_avisos_del_sistema_no_se_responden(
+    client: TestClient, db_conn: Any, cliente_wa: Any, tipo: str
+) -> None:
+    _crear_socio(db_conn, "Pedro Antonio", "Gómez Ruiz", "3001234567", NUM_PEDRO_E164)
+    msg = {"from": NUM_PEDRO_META, "id": f"wamid.{tipo}", "timestamp": "1700000000", "type": tipo}
+    _post(client, _sobre([msg]))
+    assert cliente_wa.textos == [] and cliente_wa.botones == []
 
 
 def test_numero_fuera_de_lista_blanca(
